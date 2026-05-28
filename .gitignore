@@ -1,0 +1,10 @@
+# Upstream Cozy stack clone — has its own git history, manage separately
+/cozy-stack/
+
+# Build artifacts of the twake-space bar bundle
+/twake-space-app-build/node_modules/
+/twake-space-app-build/dist/
+
+# Misc
+*.log
+.DS_Store
