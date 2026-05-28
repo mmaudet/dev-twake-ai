@@ -1,0 +1,10 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2B9C93"/>
+      <stop offset="1" stop-color="#4F52B2"/>
+    </linearGradient>
+  </defs>
+  <rect width="200" height="200" rx="36" fill="url(#g)"/>
+  <text x="100" y="118" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="62" font-weight="700" text-anchor="middle" fill="#fff">TS</text>
+</svg>

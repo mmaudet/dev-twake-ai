@@ -1,0 +1,40 @@
+{
+  "name": "twake-space-bar-build",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "build": "esbuild src/main.jsx --bundle --minify --target=es2020 --jsx=automatic --loader:.css=css --loader:.svg=dataurl --loader:.png=dataurl --loader:.jpg=dataurl --loader:.gif=dataurl --loader:.woff=dataurl --loader:.woff2=dataurl --loader:.ttf=dataurl --loader:.eot=dataurl --alias:path=path-browserify --alias:os=os-browserify --alias:stream=stream-browserify --alias:crypto=crypto-browserify --alias:buffer=buffer --alias:events=events --alias:util=util --alias:assert=assert --inject:./src/process-polyfill.js --define:process.env.NODE_ENV=\\\"production\\\" --define:global=globalThis --outfile=dist/bar.js"
+  },
+  "dependencies": {
+    "@babel/runtime": "^7.24.0",
+    "@cozy/minilog": "^1.0.0",
+    "assert": "^2.1.0",
+    "buffer": "^6.0.3",
+    "cozy-bar": "latest",
+    "cozy-client": "*",
+    "cozy-dataproxy-lib": "*",
+    "cozy-device-helper": "*",
+    "cozy-flags": "*",
+    "cozy-intent": "*",
+    "cozy-logger": "*",
+    "cozy-pouch-link": "*",
+    "cozy-realtime": "*",
+    "cozy-search": "*",
+    "cozy-stack-client": "*",
+    "cozy-ui": "*",
+    "cozy-ui-plus": "*",
+    "crypto-browserify": "^3.12.0",
+    "esbuild": "^0.21.0",
+    "events": "^3.3.0",
+    "os-browserify": "^0.3.0",
+    "path-browserify": "^1.0.1",
+    "pouchdb-browser": "*",
+    "process": "^0.11.10",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "react-router-dom": "^6.20.0",
+    "stream-browserify": "^3.0.0",
+    "twake-i18n": "^0.4.1",
+    "util": "^0.12.5"
+  }
+}

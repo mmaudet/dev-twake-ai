@@ -1,0 +1,64 @@
+{
+  "name": "Twake Space",
+  "name_prefix": "Twake",
+  "slug": "twakespace",
+  "icon": "icon.svg",
+  "categories": ["productivity"],
+  "version": "1.0.0",
+  "license": "AGPL-3.0",
+  "editor": "Linagora",
+  "type": "webapp",
+  "source": "file:///home/mmaudet/work/dev.twake.ai/twake-space-app",
+  "developer": {
+    "name": "Linagora",
+    "url": "https://twake.ai/"
+  },
+  "locales": {
+    "fr": {
+      "name": "Twake Space",
+      "short_description": "Démo collaborative Twake Space",
+      "long_description": "Démonstration interactive du module Twake Space : espaces collaboratifs, documents versionnés, messagerie, tâches Kanban, agenda et synthèses IA."
+    },
+    "en": {
+      "name": "Twake Space",
+      "short_description": "Twake Space collaborative demo"
+    }
+  },
+  "default_locale": "fr",
+  "screenshots": [],
+  "permissions": {
+    "apps": {
+      "description": "Required by the cozy-bar to display the icons of the apps",
+      "type": "io.cozy.apps",
+      "verbs": ["GET"]
+    },
+    "settings": {
+      "description": "Required by the cozy-bar to display Claudy and know which applications are coming soon",
+      "type": "io.cozy.settings",
+      "verbs": ["GET"]
+    },
+    "sharings": {
+      "description": "Required to have access to the sharings in realtime",
+      "type": "io.cozy.sharings",
+      "verbs": ["GET"]
+    },
+    "contacts": {
+      "description": "Required by cozy-bar to show the user (myself) menu",
+      "type": "io.cozy.contacts",
+      "verbs": ["GET"]
+    },
+    "files": {
+      "description": "Required by cozy-bar (recent files / search)",
+      "type": "io.cozy.files",
+      "verbs": ["GET", "POST"]
+    }
+  },
+  "routes": {
+    "/": {
+      "folder": "/",
+      "index": "index.html",
+      "public": false
+    }
+  },
+  "intents": []
+}
