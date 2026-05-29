@@ -2,7 +2,7 @@
   "name": "Grist",
   "name_prefix": "",
   "slug": "grist",
-  "icon": "icon.svg",
+  "icon": "icon.png",
   "categories": ["productivity"],
   "version": "1.0.0",
   "license": "Apache-2.0",
