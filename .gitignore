@@ -14,3 +14,4 @@
 # Misc
 *.log
 .DS_Store
+/grist-backend/.env

@@ -1,0 +1,64 @@
+{
+  "name": "Grist",
+  "name_prefix": "",
+  "slug": "grist",
+  "icon": "icon.svg",
+  "categories": ["productivity"],
+  "version": "1.0.0",
+  "license": "Apache-2.0",
+  "editor": "Linagora",
+  "type": "webapp",
+  "source": "file:///home/mmaudet/work/dev.twake.ai/grist-app",
+  "developer": {
+    "name": "Linagora",
+    "url": "https://twake.ai/"
+  },
+  "locales": {
+    "fr": {
+      "name": "Grist",
+      "short_description": "Grist embarqué (tableurs collaboratifs)",
+      "long_description": "Wrapper Cozy autour de l'instance Grist hébergée à grist.dev-twake.maudet.cloud."
+    },
+    "en": {
+      "name": "Grist",
+      "short_description": "Embedded Grist collaborative spreadsheets"
+    }
+  },
+  "default_locale": "fr",
+  "screenshots": [],
+  "permissions": {
+    "apps": {
+      "description": "Required by the cozy-bar to display the icons of the apps",
+      "type": "io.cozy.apps",
+      "verbs": ["GET"]
+    },
+    "settings": {
+      "description": "Required by cozy-bar for settings menu",
+      "type": "io.cozy.settings",
+      "verbs": ["GET"]
+    },
+    "sharings": {
+      "description": "Required to have access to the sharings in realtime",
+      "type": "io.cozy.sharings",
+      "verbs": ["GET"]
+    },
+    "contacts": {
+      "description": "Required by cozy-bar to show the user (myself) menu",
+      "type": "io.cozy.contacts",
+      "verbs": ["GET"]
+    },
+    "files": {
+      "description": "Required by cozy-bar (recent files / search)",
+      "type": "io.cozy.files",
+      "verbs": ["GET", "POST"]
+    }
+  },
+  "routes": {
+    "/": {
+      "folder": "/",
+      "index": "index.html",
+      "public": false
+    }
+  },
+  "intents": []
+}
