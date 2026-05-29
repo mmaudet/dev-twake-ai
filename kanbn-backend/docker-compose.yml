@@ -1,0 +1,78 @@
+# kan.bn stack for kanbn.dev-twake.maudet.cloud
+# - postgres: stores boards
+# - migrate: one-shot DB migrations
+# - web: Next.js app, bound to 0.0.0.0:6090 (nginx on hermes proxies to it)
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: kan-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: kan_db
+      POSTGRES_USER: kan
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - kan_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kan -d kan_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - kan-network
+
+  migrate:
+    image: ghcr.io/kanbn/kan-migrate:latest
+    container_name: kan-migrate
+    restart: "no"
+    environment:
+      POSTGRES_URL: ${POSTGRES_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - kan-network
+
+  web:
+    image: ghcr.io/kanbn/kan:latest
+    container_name: kan-web
+    restart: unless-stopped
+    ports:
+      - "6090:3000"
+    environment:
+      NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      POSTGRES_URL: ${POSTGRES_URL}
+      BETTER_AUTH_TRUSTED_ORIGINS: ${BETTER_AUTH_TRUSTED_ORIGINS}
+
+      # Generic OIDC (Authelia)
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
+      OIDC_DISCOVERY_URL: ${OIDC_DISCOVERY_URL}
+
+      # Disable email/password sign-in (OIDC-only) and self-signup
+      NEXT_PUBLIC_ALLOW_CREDENTIALS: "false"
+      NEXT_PUBLIC_DISABLE_SIGN_UP: "false"
+
+      # SMTP (Linagora) — used for magic-link/invite mails
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      EMAIL_FROM: ${EMAIL_FROM}
+      SMTP_SECURE: "false"
+      SMTP_REJECT_UNAUTHORIZED: "true"
+
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - kan-network
+
+networks:
+  kan-network:
+
+volumes:
+  kan_postgres_data:

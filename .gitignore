@@ -5,6 +5,10 @@
 /twake-space-app-build/node_modules/
 /twake-space-app-build/dist/
 
+# Secrets / env files
+/kanbn-backend/.env
+/openproject-backend/.env
+
 # Misc
 *.log
 .DS_Store

@@ -1,0 +1,64 @@
+{
+  "name": "Kan",
+  "name_prefix": "Twake",
+  "slug": "kanbn",
+  "icon": "icon.png",
+  "categories": ["productivity"],
+  "version": "1.0.0",
+  "license": "AGPL-3.0",
+  "editor": "Linagora",
+  "type": "webapp",
+  "source": "file:///home/mmaudet/work/dev.twake.ai/kanbn-app",
+  "developer": {
+    "name": "Linagora",
+    "url": "https://twake.ai/"
+  },
+  "locales": {
+    "fr": {
+      "name": "Kan",
+      "short_description": "Kanban (kan.bn) embarqué",
+      "long_description": "Wrapper Cozy autour de l'instance kan.bn hébergée à kanbn.dev-twake.maudet.cloud."
+    },
+    "en": {
+      "name": "Kan",
+      "short_description": "Embedded kan.bn kanban board"
+    }
+  },
+  "default_locale": "fr",
+  "screenshots": [],
+  "permissions": {
+    "apps": {
+      "description": "Required by the cozy-bar to display the icons of the apps",
+      "type": "io.cozy.apps",
+      "verbs": ["GET"]
+    },
+    "settings": {
+      "description": "Required by cozy-bar for settings menu",
+      "type": "io.cozy.settings",
+      "verbs": ["GET"]
+    },
+    "sharings": {
+      "description": "Required to have access to the sharings in realtime",
+      "type": "io.cozy.sharings",
+      "verbs": ["GET"]
+    },
+    "contacts": {
+      "description": "Required by cozy-bar to show the user (myself) menu",
+      "type": "io.cozy.contacts",
+      "verbs": ["GET"]
+    },
+    "files": {
+      "description": "Required by cozy-bar (recent files / search)",
+      "type": "io.cozy.files",
+      "verbs": ["GET", "POST"]
+    }
+  },
+  "routes": {
+    "/": {
+      "folder": "/",
+      "index": "index.html",
+      "public": false
+    }
+  },
+  "intents": []
+}
