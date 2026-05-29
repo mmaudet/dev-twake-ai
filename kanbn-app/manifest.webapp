@@ -1,6 +1,6 @@
 {
-  "name": "Kan",
-  "name_prefix": "Twake",
+  "name": "kan.bn",
+  "name_prefix": "",
   "slug": "kanbn",
   "icon": "icon.png",
   "categories": ["productivity"],
@@ -15,12 +15,12 @@
   },
   "locales": {
     "fr": {
-      "name": "Kan",
+      "name": "kan.bn",
       "short_description": "Kanban (kan.bn) embarqué",
       "long_description": "Wrapper Cozy autour de l'instance kan.bn hébergée à kanbn.dev-twake.maudet.cloud."
     },
     "en": {
-      "name": "Kan",
+      "name": "kan.bn",
       "short_description": "Embedded kan.bn kanban board"
     }
   },

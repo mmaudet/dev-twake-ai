@@ -25,8 +25,11 @@ button once `/api/auth/social-providers` returns `"oidc"`.
 - **Authelia side** (`/opt/authelia/config/configuration.yml` on hermes):
   client `kanbn`, redirect URI
   `https://kanbn.dev-twake.maudet.cloud/api/auth/oauth2/callback/oidc`,
-  `token_endpoint_auth_method: client_secret_basic` (better-auth uses
-  Basic Auth on the token endpoint just like OpenProject).
+  `token_endpoint_auth_method: client_secret_post`. Unlike OpenProject
+  (which posts via HTTP Basic), better-auth sends the client secret as
+  a form field; if Authelia is set to `client_secret_basic` for this
+  client the token exchange fails with
+  `invalid_client / token_endpoint_auth_method 'client_secret_post' however the OAuth 2.0 client registration does not allow this method`.
 
 `BETTER_AUTH_TRUSTED_ORIGINS` lists every Cozy app subdomain that will
 embed kan in an iframe (one per user). Without this, better-auth rejects
