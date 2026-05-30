@@ -1,0 +1,101 @@
+# Dependencies
+node_modules/
+npm-debug.log
+yarn-error.log
+yarn-debug.log*
+.pnp.*
+.yarn/*
+
+# Build
+build/
+dist/
+*.tgz
+
+# Local CouchDB data
+cozy-data/
+
+# Python Backend
+backend/__pycache__/
+backend/*.pyc
+backend/*.pyo
+backend/*.pyd
+backend/venv/
+backend/.Python
+backend/pip-log.txt
+backend/pip-delete-this-directory.txt
+backend/.pytest_cache/
+backend/models/*.bin
+backend/models/*.pt
+backend/models/*.onnx
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Environment variables & secrets
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+*.pem
+*.key
+src/config.js
+
+# Transifex
+.transifexrc
+
+# IDE & Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-workspace
+*.sublime-project
+
+# Logs
+logs/
+*.log
+lerna-debug.log*
+
+# Cache
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Mobile
+targets/mobile/hooks
+targets/mobile/platforms
+targets/mobile/plugins
+targets/mobile/www
+targets/mobile/keys
+targets/mobile/res/icons
+targets/mobile/res/screens
+targets/mobile/icon.png
+targets/mobile/store
+
+# fastlane
+mobile/fastlane/README.md
+mobile/fastlane/report.xml
+mobile/fastlane/Error*.png
+mobile/fastlane/Preview.html
+mobile/Preview.html
+
+# Default
+# /!\ KEEP THIS SECTION THE LAST ONE
+!.gitkeep
