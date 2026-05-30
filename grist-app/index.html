@@ -125,6 +125,126 @@
       return res.json();
     }
 
+    // Title-sync helpers: keep the .url shortcut in the Drive aligned with
+    // the current Grist doc title. Called on iframe mount and again when the
+    // tab is hidden / unloads, so Grist renames made during the session
+    // propagate back without any user action.
+    // Cozy /files/_find requires a Mango index on the queried fields.
+    // We create it lazily the first time we need to look up by docId; the
+    // POST is idempotent (returns the existing index on subsequent calls).
+    let indexEnsured;
+    async function ensureGristDocIdIndex() {
+      if (indexEnsured) return indexEnsured;
+      indexEnsured = fetch('https://' + cozyDomain + '/data/io.cozy.files/_index', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Authorization': 'Bearer ' + cozyToken,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          index: { fields: ['metadata.target.app', 'metadata.target.docId'] },
+          name: 'by-grist-target-docid',
+          ddoc: 'by-grist-target-docid',
+          type: 'json'
+        })
+      }).then(r => r.ok || r.status === 409).catch(() => false);
+      return indexEnsured;
+    }
+
+    async function findShortcutByDocId(docId) {
+      await ensureGristDocIdIndex();
+      const res = await fetch('https://' + cozyDomain + '/files/_find', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Authorization': 'Bearer ' + cozyToken,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          selector: {
+            'metadata.target.app': 'grist',
+            'metadata.target.docId': docId
+          },
+          use_index: '_design/by-grist-target-docid',
+          limit: 1
+        })
+      });
+      if (!res.ok) {
+        console.warn('[grist] _find failed:', res.status, await res.text());
+        return null;
+      }
+      const body = await res.json();
+      const rows = (body && (body.data || body.docs)) || [];
+      return rows[0] || null;
+    }
+
+    async function fetchGristDocName(docId) {
+      const res = await gristFetch('/api/docs/' + encodeURIComponent(docId));
+      if (!res.ok) return null;
+      const data = await res.json();
+      return (data && data.name) || null;
+    }
+
+    async function syncShortcutName(docId, opts = {}) {
+      try {
+        const [gristName, shortcut] = await Promise.all([
+          fetchGristDocName(docId),
+          findShortcutByDocId(docId)
+        ]);
+        if (!gristName) { console.log('[grist] title sync: Grist name not fetchable'); return; }
+        if (!shortcut) { console.log('[grist] title sync: no Drive shortcut found for docId', docId); return; }
+        // .url suffix is required by the Drive to keep the icon/handler.
+        const want = gristName + '.url';
+        const current = (shortcut.attributes && shortcut.attributes.name) || shortcut.name || '';
+        if (current === want) { console.log('[grist] title sync: already in sync', current); return; }
+        const fileId = shortcut.id || shortcut._id;
+        console.log('[grist] title sync:', current, '→', want, '(fileId', fileId + ')');
+        const url = 'https://' + cozyDomain + '/files/' + fileId;
+        const res = await fetch(url, {
+          method: 'PATCH',
+          credentials: 'include',
+          keepalive: !!opts.keepalive,
+          headers: {
+            'Authorization': 'Bearer ' + cozyToken,
+            'Content-Type': 'application/vnd.api+json',
+            'Accept': 'application/vnd.api+json'
+          },
+          body: JSON.stringify({
+            data: {
+              type: 'io.cozy.files',
+              id: fileId,
+              attributes: { name: want }
+            }
+          })
+        });
+        if (!res.ok) console.warn('[grist] title sync PATCH', res.status, await res.text());
+        else console.log('[grist] title sync OK');
+      } catch (e) {
+        console.warn('[grist] title sync failed:', e);
+      }
+    }
+
+    function installTitleSync(docId) {
+      // 1. On mount — bring the shortcut up to date with whatever the user
+      // already changed since the last visit.
+      syncShortcutName(docId);
+      // 2. Whenever the tab goes hidden (close, switch, navigate away),
+      // push the latest title back. Using `keepalive` so the PATCH can
+      // outlive the unload.
+      const onHide = () => {
+        if (document.visibilityState === 'hidden') {
+          syncShortcutName(docId, { keepalive: true });
+        }
+      };
+      document.addEventListener('visibilitychange', onHide);
+      window.addEventListener('pagehide', () =>
+        syncShortcutName(docId, { keepalive: true })
+      );
+    }
+
     async function bridgeCreate(folderId) {
       renderBridgePane('Création du document Grist…');
 
@@ -202,6 +322,7 @@
       // re-executing this script.
       history.replaceState(null, '', '/#/doc/' + docId);
       renderIframe(docUrl);
+      installTitleSync(docId);
     }
 
     // Hash router.
@@ -217,7 +338,9 @@
           { label: 'Retour à Grist', onClick: () => location.hash = '' });
       });
     } else if ((m = hash.match(/^#\/doc\/([^/?#]+)/))) {
-      renderIframe(GRIST_BASE + '/doc/' + decodeURIComponent(m[1]));
+      const docId = decodeURIComponent(m[1]);
+      renderIframe(GRIST_BASE + '/doc/' + docId);
+      installTitleSync(docId);
     } else {
       renderIframe();
     }

@@ -11,15 +11,48 @@
 // the service logs the would-be DELETE and exits 0 — that way the trigger
 // can be wired up before the secret is provisioned.
 
+const fs = require('fs');
 const https = require('https');
 const { URL } = require('url');
 
 const GRIST_BASE = process.env.GRIST_BASE_URL || 'https://grist.dev-twake.maudet.cloud';
-const apiKey = process.env.GRIST_API_KEY || '';
+const DEBUG_LOG = '/tmp/cleanup-grist.log';
+
+// cozy-stack hands its services an explicit env list (COZY_URL,
+// COZY_CREDENTIALS, COZY_COUCH_DOC, …) and replaces the child's env wholesale
+// — see worker/exec/common.go: `cmd.Env = env`. That means HOME, PATH and our
+// GRIST_API_KEY (loaded into the cozy-stack process via systemd
+// EnvironmentFile) are all stripped before we run. We recover the home dir
+// from /etc/passwd via os.userInfo() and read ~/.cozy/grist.env directly.
+const os = require('os');
+function loadApiKey() {
+  if (process.env.GRIST_API_KEY) return process.env.GRIST_API_KEY;
+  let home = process.env.HOME;
+  if (!home) { try { home = os.userInfo().homedir; } catch {} }
+  const envPath = process.env.GRIST_ENV_FILE
+    || (home ? `${home}/.cozy/grist.env` : null);
+  if (!envPath) return '';
+  try {
+    const text = fs.readFileSync(envPath, 'utf8');
+    const m = text.match(/^\s*GRIST_API_KEY\s*=\s*(.+?)\s*$/m);
+    return m ? m[1] : '';
+  } catch {
+    return '';
+  }
+}
+const apiKey = loadApiKey();
 
 function log(...args) {
-  // The cozy konnector runner forwards stdout/stderr to the job log.
+  // The cozy konnector runner forwards stdout/stderr to the job log, but
+  // it isn't surfaced at INFO level in journalctl, so we also tee to a
+  // tmp file for debugging the event payload + delete result.
   console.log('[cleanup-grist]', ...args);
+  try {
+    fs.appendFileSync(DEBUG_LOG,
+      new Date().toISOString() + ' ' + args.map(a =>
+        typeof a === 'string' ? a : JSON.stringify(a)
+      ).join(' ') + '\n');
+  } catch {}
 }
 
 function parseTriggerDoc() {
