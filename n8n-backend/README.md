@@ -31,6 +31,45 @@ The Authelia client `n8n` on hermes has the redirect URI
 `https://n8n.dev-twake.maudet.cloud/rest/sso/oidc/callback` and uses
 `token_endpoint_auth_method: client_secret_post`.
 
+## Skipping first-boot gates
+
+n8n shows two screens on a fresh `n8n_data` volume that we want gone so
+that users SSO straight into the editor:
+
+1. **"Set up owner account" form.** Even with the SSO redirect on,
+   n8n refuses to boot the editor until an owner exists. n8n
+   supports seeding the owner from env vars
+   (`OwnerInstanceSettingsLoader` in
+   `dist/instance-settings-loader/loaders/owner.instance-settings-loader.js`)
+   — we use that:
+
+   - `N8N_INSTANCE_OWNER_MANAGED_BY_ENV=true`
+   - `N8N_INSTANCE_OWNER_EMAIL=mmaudet@linagora.com`
+   - `N8N_INSTANCE_OWNER_FIRST_NAME=Michel`
+   - `N8N_INSTANCE_OWNER_LAST_NAME=Maudet`
+   - `N8N_INSTANCE_OWNER_PASSWORD_HASH=$2a$10$…` — a **bcrypt** hash
+     (regex `^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$`), not the raw
+     password. Generate it from inside the running container:
+
+     ```sh
+     docker exec n8n node -e \
+       "const b=require('/usr/local/lib/node_modules/n8n/node_modules/.pnpm/bcryptjs@2.4.3/node_modules/bcryptjs');
+        b.hash(process.argv[1],10).then(h=>process.stdout.write(h));" \
+       'YOUR_PASSWORD'
+     ```
+
+   With these set, n8n logs `Owner was set up successfully` on every
+   cold boot and the local email/password login still works as a
+   break-glass fallback if Authelia is down.
+
+2. **"Customize n8n to you" personalization survey.** Shown to every
+   first-time user (including JIT-provisioned OIDC users). Disabled
+   globally with `N8N_PERSONALIZATION_ENABLED=false` — the frontend
+   computes `personalizationSurveyEnabled =
+   personalization.enabled && diagnostics.enabled` (see
+   `dist/services/frontend.service.js`), so flipping this single var
+   hides the modal for everyone.
+
 ## Files
 
 - `Dockerfile` — builds `n8n-patched:latest` from `n8nio/n8n:latest` and
@@ -43,26 +82,47 @@ The Authelia client `n8n` on hermes has the redirect URI
 
 ## How it runs
 
+The full env (OIDC + owner seed + survey gate + base config) lives in
+`~/.n8n-secrets/n8n.env` on athena (mode `600`, not in the repo
+because of the bcrypt hash and the Authelia client secret). Bringing
+the container up or restarting it is then:
+
 ```sh
 docker run -d --name n8n --restart unless-stopped \
   -p 6120:5678 \
-  -e N8N_HOST=n8n.dev-twake.maudet.cloud \
-  -e N8N_PROTOCOL=https \
-  -e WEBHOOK_URL=https://n8n.dev-twake.maudet.cloud/ \
-  -e N8N_EDITOR_BASE_URL=https://n8n.dev-twake.maudet.cloud \
-  -e N8N_PROXY_HOPS=1 \
-  -e N8N_USER_MANAGEMENT_AUTHENTICATION_METHOD=email \
-  -e N8N_SSO_MANAGED_BY_ENV=true \
-  -e N8N_SSO_OIDC_LOGIN_ENABLED=true \
-  -e N8N_SSO_OIDC_CLIENT_ID=n8n \
-  -e N8N_SSO_OIDC_CLIENT_SECRET=… \
-  -e N8N_SSO_OIDC_DISCOVERY_ENDPOINT=https://auth.maudet.cloud/.well-known/openid-configuration \
-  -e N8N_SSO_OIDC_PROMPT=select_account \
-  -e N8N_SSO_REDIRECT_LOGIN_TO_SSO=true \
-  -e N8N_SSO_JUST_IN_TIME_PROVISIONING=true \
-  -e GENERIC_TIMEZONE=Europe/Paris \
+  --env-file /home/mmaudet/.n8n-secrets/n8n.env \
   -v n8n_data:/home/node/.n8n \
   n8n-patched:latest
+```
+
+The env file currently holds:
+
+```
+N8N_HOST=n8n.dev-twake.maudet.cloud
+N8N_PROTOCOL=https
+WEBHOOK_URL=https://n8n.dev-twake.maudet.cloud/
+N8N_EDITOR_BASE_URL=https://n8n.dev-twake.maudet.cloud
+N8N_PROXY_HOPS=1
+N8N_USER_MANAGEMENT_AUTHENTICATION_METHOD=email
+N8N_PERSONALIZATION_ENABLED=false
+GENERIC_TIMEZONE=Europe/Paris
+
+# OIDC SSO via Authelia
+N8N_SSO_MANAGED_BY_ENV=true
+N8N_SSO_OIDC_LOGIN_ENABLED=true
+N8N_SSO_OIDC_CLIENT_ID=n8n
+N8N_SSO_OIDC_CLIENT_SECRET=…
+N8N_SSO_OIDC_DISCOVERY_ENDPOINT=https://auth.maudet.cloud/.well-known/openid-configuration
+N8N_SSO_OIDC_PROMPT=select_account
+N8N_SSO_REDIRECT_LOGIN_TO_SSO=true
+N8N_SSO_JUST_IN_TIME_PROVISIONING=true
+
+# Seeded instance owner (skips the "Set up owner account" form)
+N8N_INSTANCE_OWNER_MANAGED_BY_ENV=true
+N8N_INSTANCE_OWNER_EMAIL=mmaudet@linagora.com
+N8N_INSTANCE_OWNER_FIRST_NAME=Michel
+N8N_INSTANCE_OWNER_LAST_NAME=Maudet
+N8N_INSTANCE_OWNER_PASSWORD_HASH=$2a$10$…
 ```
 
 UFW: `sudo ufw allow in on tailscale0 to any port 6120`.
