@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 # Provision a Cozy user under the dev-twake.maudet.cloud domain.
-# - Creates an instance with the standard apps
+# - Creates an instance with the standard apps in the dev context
+# - Sets a freshly-generated temporary passphrase the user must rotate
+#   on first login (cozy-stack no longer prints a registerToken for
+#   instances created in a context that has OIDC configured, see
+#   model/instance/lifecycle/create.go which auto-assigns a random
+#   passphrase when authentication.<ctx>.oidc is set)
 # - Installs the local twakespace webapp
-# - Sends an invitation email through smtp.linagora.com
+# - Emails the user the temp passphrase + login URL via smtp.linagora.com
 
 set -euo pipefail
 
@@ -35,44 +40,56 @@ export COZY_ADMIN_PASSPHRASE="$(cat "$HOME/.cozy/admin-passphrase.txt")"
 set -a; . "$HOME/.cozy/smtp.env"; set +a
 
 echo "== Creating instance $DOMAIN"
-CREATE_OUT=$(cozy-stack instances add "$DOMAIN" \
+cozy-stack instances add "$DOMAIN" \
   --apps "$APPS" \
-  --email "$EMAIL" --locale fr --public-name "$PUBLIC_NAME" --context-name dev)
-echo "$CREATE_OUT"
+  --email "$EMAIL" --locale fr --public-name "$PUBLIC_NAME" --context-name dev
 
-TOKEN=$(echo "$CREATE_OUT" | grep -oE 'registerToken=[a-f0-9]+' | head -1 | cut -d= -f2)
-if [ -z "$TOKEN" ]; then
-  echo "FAIL: could not extract registerToken" >&2
-  exit 1
-fi
-URL="https://${DOMAIN}/?registerToken=${TOKEN}"
+# 14 url-safe chars + an exclamation mark to satisfy Cozy's complexity
+# rules. Never written to disk; only handed to cozy-stack and the
+# outgoing mail.
+TEMP_PASS="$(openssl rand -base64 16 | tr -d '/+=' | head -c 14)!"
+
+echo
+echo "== Setting temporary passphrase"
+cozy-stack instances set-passphrase "$DOMAIN" "$TEMP_PASS"
 
 echo
 echo "== Installing twakespace from $APP_SRC"
 cozy-stack apps install twakespace "$APP_SRC" --domain "$DOMAIN"
 
+URL="https://${DOMAIN}/"
+
 echo
 echo "== Sending invitation email to $EMAIL"
-python3 - "$PUBLIC_NAME" "$EMAIL" "$URL" <<'PY'
+python3 - "$PUBLIC_NAME" "$EMAIL" "$URL" "$TEMP_PASS" <<'PY'
 import os, smtplib, ssl, sys
 from email.message import EmailMessage
 
-name, to, url = sys.argv[1], sys.argv[2], sys.argv[3]
-base = url.split("/?")[0]
+name, to, url, temp = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+base = url.rstrip("/")
 
 text = f"""Bonjour {name},
 
 Tu as un accès à la plateforme de dev Twake (Cozy) que j'héberge.
 
 Ton instance personnelle :
-{url}
+{base}/
 
-Ce lien te permet de définir ton mot de passe et d'accéder à ta Cozy.
-Le lien d'inscription est à usage unique — une fois ton mot de passe défini, l'URL de connexion devient :
-{base}
+Mot de passe temporaire pour ta première connexion :
+{temp}
 
-Ton compte vient pré-installé avec les apps : Drive, Photos, Contacts, Notes,
-Passwords, Store, Settings, ainsi que la démo Twake Space.
+Pense à le changer immédiatement après la connexion via Paramètres → Sécurité.
+
+Ton compte vient pré-installé avec les apps standard (Drive, Photos, Contacts, Notes,
+Passwords, Settings, Store, Home), Twake Drive patché, ainsi que les coquilles maison :
+- Twake Space (démo Twake Chat)
+- OpenProject : https://openproject.dev-twake.maudet.cloud
+- kan.bn : https://kanbn.dev-twake.maudet.cloud
+- Excalidraw : intégré dans Drive (+ Créer → Excalidraw)
+- Grist : intégré dans Drive (+ Créer → Grist)
+- n8n : https://n8n.dev-twake.maudet.cloud (SSO Authelia)
+
+Toutes les apps tierces utilisent le SSO Authelia (auth.maudet.cloud).
 
 Si problème, ping-moi.
 
@@ -81,12 +98,21 @@ Michel
 
 html = f"""<p>Bonjour {name},</p>
 <p>Tu as un accès à la plateforme de dev <b>Twake (Cozy)</b> que j'héberge.</p>
-<p>Ton instance personnelle :<br><a href="{url}">{url}</a></p>
-<p>Ce lien te permet de définir ton mot de passe et d'accéder à ta Cozy.<br>
-Le lien d'inscription est à usage unique — une fois ton mot de passe défini, l'URL de connexion devient :<br>
-<a href="{base}">{base}</a></p>
-<p>Ton compte vient pré-installé avec les apps : Drive, Photos, Contacts, Notes,
-Passwords, Store, Settings, ainsi que la démo <b>Twake Space</b>.</p>
+<p>Ton instance personnelle :<br><a href="{base}/">{base}/</a></p>
+<p>Mot de passe temporaire pour ta première connexion :<br>
+<code style="background:#f3f3f7;padding:4px 8px;border-radius:4px;font-size:14px">{temp}</code></p>
+<p>Pense à le changer immédiatement après la connexion via <b>Paramètres → Sécurité</b>.</p>
+<p>Ton compte vient pré-installé avec les apps standard (Drive, Photos, Contacts, Notes,
+Passwords, Settings, Store, Home), <b>Twake Drive patché</b>, ainsi que les coquilles maison :</p>
+<ul>
+  <li>Twake Space (démo Twake Chat)</li>
+  <li>OpenProject : <a href="https://openproject.dev-twake.maudet.cloud">https://openproject.dev-twake.maudet.cloud</a></li>
+  <li>kan.bn : <a href="https://kanbn.dev-twake.maudet.cloud">https://kanbn.dev-twake.maudet.cloud</a></li>
+  <li>Excalidraw : intégré dans Drive (<i>+ Créer → Excalidraw</i>)</li>
+  <li>Grist : intégré dans Drive (<i>+ Créer → Grist</i>)</li>
+  <li>n8n : <a href="https://n8n.dev-twake.maudet.cloud">https://n8n.dev-twake.maudet.cloud</a> (SSO Authelia)</li>
+</ul>
+<p>Toutes les apps tierces utilisent le SSO Authelia (auth.maudet.cloud).</p>
 <p>Si problème, ping-moi.</p>
 <p>Michel</p>
 """
@@ -111,5 +137,6 @@ print(f"Sent → {to} (bcc: {BCC})")
 PY
 
 echo
-echo "== Done. Register URL:"
+echo "== Done. Login URL:"
 echo "$URL"
+echo "== Done. Temporary passphrase (also in the email): $TEMP_PASS"

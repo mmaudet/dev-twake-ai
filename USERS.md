@@ -11,6 +11,7 @@ Each user gets a dedicated Cozy instance with the standard apps + the local
 | qvalmori   | qvalmori    | qvalmori@linagora.com  | https://qvalmori.dev-twake.maudet.cloud/          | 2026-05-28   |
 | zbellot    | Zoé         | zbellot@linagora.com   | https://zbellot.dev-twake.maudet.cloud/           | 2026-05-28   |
 | dpotokina  | Diana       | dpotokina@linagora.com | https://dpotokina.dev-twake.maudet.cloud/         | 2026-05-28   |
+| xguimard   | Xavier      | xguimard@linagora.com  | https://xguimard.dev-twake.maudet.cloud/          | 2026-05-30   |
 
 ## Add a new user
 
