@@ -319,3 +319,103 @@ html, body, #app
   color #e53935
   font-size 13px
   padding 16px 10px
+
+// ─── Widget store ─────────────────────────────────────────────────────────
+.widgetstore-back
+  display inline-block
+  margin-top 4px
+  font-size 13px
+  color #297EF2
+  text-decoration none
+
+  &:hover
+    text-decoration underline
+
+.widgetstore-section
+  margin-bottom 28px
+
+.widgetstore-section-title
+  font-size 13px
+  font-weight 600
+  text-transform uppercase
+  letter-spacing 0.06em
+  color #6B7280
+  margin 0 0 12px
+
+.widgetstore-grid
+  display grid
+  grid-template-columns repeat(auto-fill, minmax(360px, 1fr))
+  gap 12px
+
+.widgetstore-card
+  display flex
+  align-items center
+  gap 14px
+  padding 14px 16px
+  background #ffffff
+  border 1px solid #ebecf0
+  border-radius 12px
+  box-shadow 0 1px 2px rgba(27, 29, 45, 0.04)
+  transition border-color 0.12s
+
+  &.is-enabled
+    border-color rgba(41, 126, 242, 0.4)
+
+.widgetstore-card-text
+  flex 1
+  min-width 0
+
+.widgetstore-card-title
+  font-size 14px
+  font-weight 600
+  color #1B1D2D
+  margin-bottom 2px
+
+.widgetstore-card-desc
+  font-size 12px
+  color #6B7280
+  line-height 1.4
+
+.widgetstore-switch
+  position relative
+  width 44px
+  height 24px
+  flex-shrink 0
+
+  input
+    opacity 0
+    width 0
+    height 0
+
+  input:disabled + .widgetstore-switch-track
+    opacity 0.4
+    cursor not-allowed
+
+.widgetstore-switch-track
+  position absolute
+  top 0
+  left 0
+  right 0
+  bottom 0
+  background #d1d5db
+  border-radius 12px
+  cursor pointer
+  transition background 0.15s
+
+  &::before
+    content ''
+    position absolute
+    top 3px
+    left 3px
+    width 18px
+    height 18px
+    background #ffffff
+    border-radius 50%
+    transition transform 0.15s
+    box-shadow 0 1px 2px rgba(0, 0, 0, 0.2)
+
+.widgetstore-switch input:checked + .widgetstore-switch-track
+  background #297EF2
+
+.widgetstore-switch input:checked + .widgetstore-switch-track::before
+  transform translateX(20px)

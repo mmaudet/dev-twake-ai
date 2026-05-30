@@ -1,34 +1,56 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useClient } from 'cozy-client'
 
+import { WIDGET_CATALOG, listWidgets } from 'src/widgets/catalog'
+
 const SETTING_ID = 'dashboard'
-// 3 widgets after the redesign — Quick capture lives in the sidebar now.
-const DEFAULT_LAYOUT = {
-  lg: [
-    { i: 'recentFiles', x: 0, y: 0, w: 6, h: 6, minW: 3, minH: 4 },
-    { i: 'recentNotes', x: 6, y: 0, w: 6, h: 6, minW: 3, minH: 4 },
-    { i: 'tasks',       x: 0, y: 6, w: 12, h: 7, minW: 4, minH: 4 }
-  ]
-}
 
 const DEFAULT_CONFIG = {
   kanbnApiKey: '',
   openprojectApiKey: ''
 }
 
-// Stocké dans io.cozy.settings avec un _id custom. C'est la convention Cozy
-// pour des settings d'app : on crée un doc avec un _id stable.
-const SETTING_DOC_ID = 'io.cozy.settings/dashboard.layout'
+// Build a default layout from the catalogue, in declaration order, packing
+// widgets into 12-column rows. Only widgets with enabledByDefault=true are
+// included.
+const buildDefaultLayout = () => {
+  let x = 0
+  let y = 0
+  let rowH = 0
+  const lg = []
+  for (const w of listWidgets()) {
+    if (!w.enabledByDefault) continue
+    const { w: ww, h, minW, minH } = w.defaultLayout
+    if (x + ww > 12) { x = 0; y += rowH; rowH = 0 }
+    lg.push({ i: w.id, x, y, w: ww, h, minW, minH })
+    x += ww
+    rowH = Math.max(rowH, h)
+  }
+  return { lg }
+}
+
+const DEFAULT_LAYOUT = buildDefaultLayout()
+
+// widgets state shape: { [id]: { enabled: boolean, config: {...} } }
+const buildDefaultWidgets = () => {
+  const out = {}
+  for (const w of listWidgets()) {
+    out[w.id] = { enabled: !!w.enabledByDefault, config: {} }
+  }
+  return out
+}
+
+const DEFAULT_WIDGETS = buildDefaultWidgets()
 
 const useDashboardLayout = () => {
   const client = useClient()
   const [layouts, setLayouts] = useState(DEFAULT_LAYOUT)
   const [config, setConfig] = useState(DEFAULT_CONFIG)
+  const [widgets, setWidgets] = useState(DEFAULT_WIDGETS)
   const [loaded, setLoaded] = useState(false)
   const revRef = useRef(null)
   const saveTimer = useRef(null)
 
-  // Initial fetch
   useEffect(() => {
     let cancelled = false
     const fetch = async () => {
@@ -41,8 +63,16 @@ const useDashboardLayout = () => {
         revRef.current = doc._rev
         if (doc.layouts) setLayouts(doc.layouts)
         if (doc.config) setConfig({ ...DEFAULT_CONFIG, ...doc.config })
+        if (doc.widgets) {
+          // Merge saved widgets state with catalogue defaults so newly added
+          // catalogue entries appear (disabled) without losing user toggles.
+          const merged = { ...DEFAULT_WIDGETS }
+          for (const id of Object.keys(doc.widgets)) {
+            if (merged[id]) merged[id] = { ...merged[id], ...doc.widgets[id] }
+          }
+          setWidgets(merged)
+        }
       } catch (err) {
-        // 404 = doc doesn't exist yet, fine — keep defaults
         if (err.status !== 404) {
           // eslint-disable-next-line no-console
           console.warn('[dashboard] could not load settings', err)
@@ -56,13 +86,14 @@ const useDashboardLayout = () => {
   }, [client])
 
   const persist = useCallback(
-    (nextLayouts, nextConfig) => {
+    (nextLayouts, nextConfig, nextWidgets) => {
       if (saveTimer.current) clearTimeout(saveTimer.current)
       saveTimer.current = setTimeout(async () => {
         const body = {
           _id: SETTING_ID,
           layouts: nextLayouts,
-          config: nextConfig
+          config: nextConfig,
+          widgets: nextWidgets
         }
         if (revRef.current) body._rev = revRef.current
         try {
@@ -73,7 +104,6 @@ const useDashboardLayout = () => {
           )
           revRef.current = res.rev || res._rev
         } catch (err) {
-          // 409 = conflict, refetch rev and retry once
           if (err.status === 409) {
             try {
               const current = await client.stackClient.fetchJSON(
@@ -105,21 +135,79 @@ const useDashboardLayout = () => {
   const updateLayouts = useCallback(
     nextLayouts => {
       setLayouts(nextLayouts)
-      persist(nextLayouts, config)
+      persist(nextLayouts, config, widgets)
     },
-    [config, persist]
+    [config, widgets, persist]
   )
 
   const updateConfig = useCallback(
     nextConfig => {
       const merged = { ...config, ...nextConfig }
       setConfig(merged)
-      persist(layouts, merged)
+      persist(layouts, merged, widgets)
     },
-    [config, layouts, persist]
+    [config, layouts, widgets, persist]
   )
 
-  return { layouts, config, loaded, updateLayouts, updateConfig, DEFAULT_LAYOUT }
+  // Toggle a widget on/off. When turning on, append it to the layout with
+  // its catalogue defaults. When turning off, remove it from the layout
+  // (but keep its config sub-object).
+  const setWidgetEnabled = useCallback(
+    (id, enabled) => {
+      const cat = WIDGET_CATALOG[id]
+      if (!cat) return
+      const nextWidgets = {
+        ...widgets,
+        [id]: { ...(widgets[id] || { config: {} }), enabled }
+      }
+      let nextLayouts = layouts
+      if (enabled) {
+        const lg = layouts.lg || []
+        if (!lg.some(item => item.i === id)) {
+          // append at the bottom — find max y+h then place there
+          const yBottom = lg.reduce((max, it) => Math.max(max, it.y + it.h), 0)
+          nextLayouts = {
+            ...layouts,
+            lg: [...lg, { i: id, x: 0, y: yBottom, ...cat.defaultLayout }]
+          }
+        }
+      } else {
+        nextLayouts = {
+          ...layouts,
+          lg: (layouts.lg || []).filter(item => item.i !== id)
+        }
+      }
+      setWidgets(nextWidgets)
+      setLayouts(nextLayouts)
+      persist(nextLayouts, config, nextWidgets)
+    },
+    [widgets, layouts, config, persist]
+  )
+
+  const updateWidgetConfig = useCallback(
+    (id, patch) => {
+      const prev = widgets[id] || { enabled: false, config: {} }
+      const nextWidgets = {
+        ...widgets,
+        [id]: { ...prev, config: { ...(prev.config || {}), ...patch } }
+      }
+      setWidgets(nextWidgets)
+      persist(layouts, config, nextWidgets)
+    },
+    [widgets, layouts, config, persist]
+  )
+
+  return {
+    layouts,
+    config,
+    widgets,
+    loaded,
+    updateLayouts,
+    updateConfig,
+    setWidgetEnabled,
+    updateWidgetConfig,
+    DEFAULT_LAYOUT
+  }
 }
 
 export default useDashboardLayout

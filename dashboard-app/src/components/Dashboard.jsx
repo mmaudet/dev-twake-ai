@@ -4,7 +4,6 @@ import { Responsive, WidthProvider } from 'react-grid-layout'
 import 'react-grid-layout/css/styles.css'
 import 'react-resizable/css/styles.css'
 
-import { useI18n } from 'cozy-ui/transpiled/react/I18n'
 import Spinner from 'cozy-ui/transpiled/react/Spinner'
 import Alerter from 'cozy-ui/transpiled/react/Alerter'
 
@@ -12,22 +11,14 @@ import useDashboardLayout from 'src/hooks/useDashboardLayout'
 import Sidebar from 'src/components/Sidebar'
 import ActionsMenu from 'src/components/ActionsMenu'
 import WidgetCard from 'src/components/WidgetCard'
-import RecentFiles from 'src/components/widgets/RecentFiles'
-import RecentNotes from 'src/components/widgets/RecentNotes'
-import Tasks from 'src/components/widgets/Tasks'
+import { WIDGET_CATALOG } from 'src/widgets/catalog'
 
 const ResponsiveGridLayout = WidthProvider(Responsive)
 
-const WIDGETS = {
-  recentFiles: { titleKey: 'widgets.recentFiles.title', Component: RecentFiles },
-  recentNotes: { titleKey: 'widgets.recentNotes.title', Component: RecentNotes },
-  tasks:       { titleKey: 'widgets.tasks.title',       Component: Tasks }
-}
-
 const Dashboard = () => {
-  const { t } = useI18n()
   const {
-    layouts, config, loaded, updateLayouts, updateConfig, DEFAULT_LAYOUT
+    layouts, config, widgets, loaded,
+    updateLayouts, updateConfig, updateWidgetConfig, DEFAULT_LAYOUT
   } = useDashboardLayout()
 
   const onResetLayout = () => {
@@ -39,21 +30,37 @@ const Dashboard = () => {
     return (
       <div className="dashboard-shell">
         <Sidebar config={{}} />
-        <div className="dashboard-main" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <main className="dashboard-main" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           <Spinner size="xxlarge" />
-        </div>
+        </main>
       </div>
     )
   }
 
+  // Only render widgets whose catalogue entry has a Component AND that the
+  // user hasn't disabled. Items in the layout that don't match are filtered
+  // out (catalogue entries removed in a future release, "coming soon"
+  // widgets, etc.).
   const items = (layouts.lg || [])
-    .filter(item => WIDGETS[item.i])
+    .filter(item => {
+      const cat = WIDGET_CATALOG[item.i]
+      if (!cat || !cat.Component) return false
+      const w = widgets[item.i]
+      return w ? w.enabled !== false : true
+    })
     .map(item => {
-      const { Component, titleKey } = WIDGETS[item.i]
+      const cat = WIDGET_CATALOG[item.i]
+      const Component = cat.Component
+      const widgetState = widgets[item.i] || { config: {} }
       return (
         <div key={item.i} className="dashboard-widget-cell">
-          <WidgetCard title={t(titleKey)}>
-            <Component config={config} updateConfig={updateConfig} />
+          <WidgetCard title={cat.name}>
+            <Component
+              config={config}
+              updateConfig={updateConfig}
+              widgetConfig={widgetState.config}
+              updateWidgetConfig={patch => updateWidgetConfig(item.i, patch)}
+            />
           </WidgetCard>
         </div>
       )
@@ -64,7 +71,7 @@ const Dashboard = () => {
       <Sidebar config={config} />
       <main className="dashboard-main">
         <header className="dashboard-header">
-          <h1 className="dashboard-title">{t('appTitle')}</h1>
+          <h1 className="dashboard-title">Tableau de bord</h1>
           <div className="dashboard-actions">
             <ActionsMenu onResetLayout={onResetLayout} />
           </div>
