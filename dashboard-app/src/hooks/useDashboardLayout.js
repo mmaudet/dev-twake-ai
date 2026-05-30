@@ -166,15 +166,21 @@ const useDashboardLayout = () => {
         if (!lg.some(item => item.i === id)) {
           // append at the bottom — find max y+h then place there
           const yBottom = lg.reduce((max, it) => Math.max(max, it.y + it.h), 0)
-          nextLayouts = {
-            ...layouts,
-            lg: [...lg, { i: id, x: 0, y: yBottom, ...cat.defaultLayout }]
+          const item = { i: id, x: 0, y: yBottom, ...cat.defaultLayout }
+          // Add to lg AND seed the other breakpoints so react-grid-layout
+          // doesn't synthesize a minimum-sized entry when the viewport is
+          // currently at md/sm/xs/xxs.
+          nextLayouts = { ...layouts, lg: [...lg, item] }
+          for (const bp of ['md', 'sm', 'xs', 'xxs']) {
+            if (layouts[bp] && !layouts[bp].some(it => it.i === id)) {
+              nextLayouts[bp] = [...layouts[bp], { ...item }]
+            }
           }
         }
       } else {
-        nextLayouts = {
-          ...layouts,
-          lg: (layouts.lg || []).filter(item => item.i !== id)
+        nextLayouts = { ...layouts }
+        for (const bp of Object.keys(layouts)) {
+          nextLayouts[bp] = (layouts[bp] || []).filter(item => item.i !== id)
         }
       }
       setWidgets(nextWidgets)

@@ -52,7 +52,7 @@ export const WIDGET_CATALOG = {
     accent: 'icon-task',
     category: 'external',
     Component: Tasks,
-    defaultLayout: { w: 12, h: 7, minW: 4, minH: 4 },
+    defaultLayout: { w: 6, h: 6, minW: 3, minH: 4 },
     needsConfig: true, // kan.bn API key
     enabledByDefault: true
   },
