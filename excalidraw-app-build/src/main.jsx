@@ -58,6 +58,30 @@ async function fetchFileMeta({ cozyDomain, cozyToken, fileId }) {
   return body.data
 }
 
+// Walk up from dirId to the root, collecting {id, name} for each parent
+// folder. Used to render the breadcrumb path under the filename. We stop
+// at the root directory (whose name is "" and id "io.cozy.files.root-dir").
+async function fetchParentPath({ cozyDomain, cozyToken }, startDirId) {
+  const chain = []
+  let id = startDirId
+  // Cap the climb to a safe depth so a bad data shape can't loop.
+  for (let depth = 0; depth < 20 && id && id !== 'io.cozy.files.root-dir'; depth++) {
+    const res = await fetch(`https://${cozyDomain}/files/${id}`, {
+      credentials: 'include',
+      headers: {
+        'Authorization': `Bearer ${cozyToken}`,
+        'Accept': 'application/vnd.api+json'
+      }
+    })
+    if (!res.ok) break
+    const body = await res.json()
+    const a = body.data.attributes
+    chain.unshift({ id: body.data.id, name: a.name || '/' })
+    id = a.dir_id
+  }
+  return chain
+}
+
 async function fetchFileContent({ cozyDomain, cozyToken, fileId }) {
   const res = await fetch(`https://${cozyDomain}/files/download/${fileId}`, {
     credentials: 'include',
@@ -114,57 +138,201 @@ async function renameFile({ cozyDomain, cozyToken, fileId }, newName) {
   return body.data.attributes.name
 }
 
-const titleBarStyle = {
+// Top bar styled after cozy-notes' editor header:
+//   [back arrow] [app icon] [bold filename | breadcrumb path]
+// 48px tall, light background, thin bottom shadow. The filename is a
+// click-to-edit affordance — clicking it swaps the bold label for an
+// input pre-filled with the current name. Blur or Enter commits.
+const barStyle = {
   display: 'flex',
   alignItems: 'center',
-  gap: '0.5em',
-  padding: '0.5em 1em',
-  borderBottom: '1px solid #e6e6e6',
-  background: '#f5f5fb',
+  gap: '0.75em',
+  padding: '0 1rem',
+  background: '#fff',
+  boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
   fontFamily: 'system-ui, sans-serif',
   flex: '0 0 auto',
-  minHeight: '2.5em',
+  height: '3rem',
   boxSizing: 'border-box'
 }
-const titleInputStyle = {
-  flex: '1 1 auto',
-  border: '1px solid transparent',
-  borderRadius: 4,
-  padding: '0.3em 0.6em',
-  fontSize: '1em',
+const iconBtnStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: '2rem',
+  height: '2rem',
+  border: 0,
   background: 'transparent',
-  color: '#333',
-  outline: 'none',
+  color: '#444',
+  cursor: 'pointer',
+  borderRadius: 4,
+  padding: 0,
+  flex: '0 0 auto'
+}
+const appIconStyle = { width: '1.5rem', height: '1.5rem', flex: '0 0 auto' }
+const fileInfosStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'center',
+  minWidth: 0,
+  flex: '1 1 auto',
+  lineHeight: 1.2
+}
+const filenameRowStyle = {
+  display: 'flex',
+  alignItems: 'baseline',
+  gap: '0.15em',
   minWidth: 0
 }
-const extLabelStyle = {
+const filenameLabelStyle = {
+  fontWeight: 600,
+  color: '#222',
+  fontSize: '0.95rem',
+  cursor: 'text',
+  padding: '2px 4px',
+  borderRadius: 3,
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  maxWidth: '40em'
+}
+const filenameLabelHoverStyle = { ...filenameLabelStyle, background: '#f3f3f7' }
+const filenameExtStyle = {
   color: '#999',
-  fontSize: '0.85em',
-  fontFamily: 'monospace'
+  fontSize: '0.85rem',
+  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace'
+}
+const filenameInputStyle = {
+  border: '1px solid #6965DB',
+  borderRadius: 4,
+  padding: '2px 6px',
+  fontSize: '0.95rem',
+  fontWeight: 600,
+  color: '#222',
+  outline: 'none',
+  background: '#fff',
+  minWidth: '8em',
+  maxWidth: '40em'
+}
+const breadcrumbRowStyle = {
+  fontSize: '0.78rem',
+  color: '#888',
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis'
+}
+const breadcrumbSepStyle = { padding: '0 0.4em', color: '#bbb' }
+const breadcrumbLinkStyle = { color: '#666', textDecoration: 'none' }
+
+// Build a URL into the user's Drive at a given folder.
+function driveFolderUrl(cozyDomain, folderId) {
+  // We're at e.g. mmaudet-excalidraw.dev-twake.maudet.cloud; the Drive lives
+  // at mmaudet-drive.dev-twake.maudet.cloud. Swap the "excalidraw" segment.
+  const parts = location.hostname.split('.')
+  parts[0] = parts[0].replace(/-excalidraw$/, '-drive')
+  return `${location.protocol}//${parts.join('.')}/#/folder/${folderId}`
 }
 
-function TitleBar({ value, onCommit }) {
+function BackButton({ cozyDomain, dirId }) {
+  if (!dirId) return null
+  return React.createElement('a', {
+    href: driveFolderUrl(cozyDomain, dirId),
+    title: 'Retour au dossier',
+    'aria-label': 'Retour au dossier',
+    style: { ...iconBtnStyle, textDecoration: 'none' }
+  },
+    React.createElement('svg', {
+      width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none',
+      stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round'
+    }, React.createElement('path', { d: 'M15 6l-6 6 6 6' }))
+  )
+}
+
+function AppIconImg() {
+  return React.createElement('img', {
+    src: 'icon.svg',
+    alt: '',
+    style: appIconStyle
+  })
+}
+
+function Breadcrumb({ cozyDomain, path, dirId }) {
+  // `path` is a list of {name, id} from root → parent of the file.
+  // Each segment links to the Drive at that folder.
+  if (!path || !path.length) return null
+  const items = []
+  path.forEach((seg, i) => {
+    items.push(React.createElement('a', {
+      key: 'seg-' + i,
+      href: driveFolderUrl(cozyDomain, seg.id),
+      style: breadcrumbLinkStyle
+    }, seg.name))
+    if (i < path.length - 1) {
+      items.push(React.createElement('span', {
+        key: 'sep-' + i,
+        style: breadcrumbSepStyle
+      }, '›'))
+    }
+  })
+  return React.createElement('div', { style: breadcrumbRowStyle }, ...items)
+}
+
+function TitleBar({ cozyDomain, value, dirId, path, onCommit }) {
+  const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
+  const [hover, setHover] = useState(false)
+  const inputRef = useRef(null)
+
   useEffect(() => { setDraft(value) }, [value])
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      inputRef.current.focus()
+      inputRef.current.select()
+    }
+  }, [editing])
+
   const commit = () => {
+    setEditing(false)
     const next = sanitizeName(draft)
     if (next && next !== value) onCommit(next)
     else setDraft(value)
   }
-  return React.createElement('div', { style: titleBarStyle },
-    React.createElement('input', {
-      style: titleInputStyle,
-      value: draft,
-      onChange: e => setDraft(e.target.value),
-      onBlur: commit,
-      onKeyDown: e => {
-        if (e.key === 'Enter') { e.preventDefault(); e.target.blur() }
-        else if (e.key === 'Escape') { e.preventDefault(); setDraft(value); e.target.blur() }
-      },
-      placeholder: 'Sans titre',
-      'aria-label': 'Nom du dessin'
-    }),
-    React.createElement('span', { style: extLabelStyle }, EXTENSION)
+
+  const filenameView = editing
+    ? React.createElement('div', { style: filenameRowStyle },
+        React.createElement('input', {
+          ref: inputRef,
+          style: filenameInputStyle,
+          value: draft,
+          onChange: e => setDraft(e.target.value),
+          onBlur: commit,
+          onKeyDown: e => {
+            if (e.key === 'Enter') { e.preventDefault(); e.target.blur() }
+            else if (e.key === 'Escape') { e.preventDefault(); setDraft(value); setEditing(false) }
+          },
+          placeholder: 'Sans titre',
+          'aria-label': 'Nom du fichier'
+        }),
+        React.createElement('span', { style: filenameExtStyle }, EXTENSION)
+      )
+    : React.createElement('div', { style: filenameRowStyle },
+        React.createElement('span', {
+          style: hover ? filenameLabelHoverStyle : filenameLabelStyle,
+          onClick: () => setEditing(true),
+          onMouseEnter: () => setHover(true),
+          onMouseLeave: () => setHover(false),
+          title: 'Cliquer pour renommer'
+        }, value || 'Sans titre'),
+        React.createElement('span', { style: filenameExtStyle }, EXTENSION)
+      )
+
+  return React.createElement('header', { style: barStyle },
+    React.createElement(BackButton, { cozyDomain, dirId }),
+    React.createElement(AppIconImg),
+    React.createElement('div', { style: fileInfosStyle },
+      filenameView,
+      React.createElement(Breadcrumb, { cozyDomain, path, dirId })
+    )
   )
 }
 
@@ -173,6 +341,8 @@ function App() {
   const [initial, setInitial] = useState(null)
   const [excalApi, setExcalApi] = useState(null)
   const [title, setTitle] = useState('')
+  const [dirId, setDirId] = useState(null)
+  const [path, setPath] = useState([])
   const saveTimer = useRef(null)
   const lastSavedJson = useRef('')
   // The Drive file name is the single source of truth. We mirror it into
@@ -186,6 +356,12 @@ function App() {
         currentDriveName.current = meta.attributes.name
         const driveTitle = stripExt(meta.attributes.name)
         setTitle(driveTitle)
+        setDirId(meta.attributes.dir_id)
+        // Kick off the parent-folder walk in the background; the editor
+        // mounts without waiting.
+        fetchParentPath(ctx, meta.attributes.dir_id)
+          .then(setPath)
+          .catch(e => console.warn('[excalidraw] path lookup failed', e))
         const appState = { ...(scene.appState || {}), collaborators: new Map() }
         appState.name = driveTitle
         // Re-stringify with the synced name so the very first save (if
@@ -328,7 +504,13 @@ function App() {
       width: '100%'
     }
   },
-    React.createElement(TitleBar, { value: title, onCommit: onTitleCommit }),
+    React.createElement(TitleBar, {
+      cozyDomain: ctx.cozyDomain,
+      value: title,
+      dirId,
+      path,
+      onCommit: onTitleCommit
+    }),
     React.createElement('div', {
       style: {
         flex: '1 1 auto',
