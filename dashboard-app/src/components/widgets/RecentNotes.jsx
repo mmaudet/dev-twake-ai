@@ -44,14 +44,14 @@ const RecentNotes = () => {
   const cozyUrl = client.getStackClient().uri
 
   if (result.fetchStatus === 'loading' || !result.data) {
-    return <div className="u-flex u-flex-justify-center u-mt-1"><Spinner size="large" /></div>
+    return <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 16 }}><Spinner size="large" /></div>
   }
   const isNote = f =>
     f.mime === 'text/vnd.cozy.note+markdown' ||
     f.class === 'note' ||
     (f.name && f.name.endsWith('.cozy-note'))
   const notes = (result.data || []).filter(isNote).slice(0, 8)
-  if (notes.length === 0) return <div className="u-c-grey">Aucune note récente.</div>
+  if (notes.length === 0) return <div className="dashboard-empty">Aucune note récente.</div>
 
   return (
     <ul className="dashboard-list">
@@ -61,7 +61,9 @@ const RecentNotes = () => {
           className="dashboard-list-item"
           onClick={() => window.open(buildNoteUrl(cozyUrl, note._id), '_blank')}
         >
-          <Icon icon="file-type-text" size={20} className="dashboard-list-icon" />
+          <span className="dashboard-list-icon icon-note">
+            <Icon icon="file-type-text" size={18} />
+          </span>
           <div className="dashboard-list-text">
             <div className="dashboard-list-primary">{displayName(note.name)}</div>
             <div className="dashboard-list-secondary">{formatDate(note.updated_at || note.created_at)}</div>

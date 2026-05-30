@@ -1,3 +1,187 @@
+// ─── Twake palette ─────────────────────────────────────────────────────────
+:root
+  --twake-blue: #297EF2
+  --twake-blue-hover: #0E61D1
+  --twake-blue-wash: rgba(41, 126, 242, 0.08)
+  --twake-blue-wash-strong: rgba(41, 126, 242, 0.14)
+  --text-primary: #1B1D2D
+  --text-secondary: #6B7280
+  --text-tertiary: #c2c4c7
+  --bg-default: #ffffff
+  --bg-subtle: #f8f9fb
+  --bg-hover: rgba(41, 126, 242, 0.08)
+  --border-default: #ebecf0
+  --radius-md: 8px
+  --radius-lg: 12px
+  --shadow-card: 0 1px 2px rgba(27, 29, 45, 0.06)
+
+// ─── App shell ─────────────────────────────────────────────────────────────
+html, body, #app
+  height 100%
+
+.dashboard-shell
+  display flex
+  height calc(100vh - 56px)
+  width 100%
+
+// ─── Sidebar ───────────────────────────────────────────────────────────────
+.dashboard-sidebar
+  flex 0 0 240px
+  display flex
+  flex-direction column
+  border-right 1px solid #ebecf0
+  padding 20px 16px
+  background #ffffff
+
+.dashboard-sidebar-spacer
+  flex 1 1 auto
+
+.create-btn
+  display flex
+  align-items center
+  justify-content center
+  gap 8px
+  width 100%
+  padding 14px 16px
+  background #297EF2
+  color #ffffff
+  font-weight 600
+  font-size 14px
+  font-family inherit
+  border none
+  border-radius 8px
+  cursor pointer
+  transition background 0.12s
+  box-shadow 0 1px 2px rgba(41, 126, 242, 0.2)
+
+  &:hover
+    background #0E61D1
+
+  &:focus
+    outline 2px solid rgba(41, 126, 242, 0.14)
+    outline-offset 2px
+
+.create-btn-icon
+  font-size 18px
+  font-weight 600
+  line-height 1
+  color #ffffff
+
+.create-menu
+  margin-top 8px
+  background #ffffff
+  border 1px solid #ebecf0
+  border-radius 8px
+  box-shadow 0 4px 12px rgba(27, 29, 45, 0.12)
+  padding 6px
+  display flex
+  flex-direction column
+
+.create-menu-item
+  display flex
+  align-items center
+  gap 12px
+  padding 10px 12px
+  border-radius 6px
+  cursor pointer
+  font-size 14px
+  font-family inherit
+  color #1B1D2D
+  background transparent
+  border none
+  text-align left
+  width 100%
+
+  &:hover
+    background rgba(41, 126, 242, 0.08)
+
+  &:disabled
+    opacity 0.5
+    cursor wait
+
+.create-menu-item-icon
+  width 24px
+  height 24px
+  display flex
+  align-items center
+  justify-content center
+  flex-shrink 0
+
+// ─── Storage block ────────────────────────────────────────────────────────
+.storage-block
+  display flex
+  align-items center
+  gap 10px
+  padding-top 12px
+  border-top 1px solid #ebecf0
+  color #6B7280
+  font-size 12px
+
+.storage-block-icon
+  flex-shrink 0
+  width 28px
+  height 28px
+  display flex
+  align-items center
+  justify-content center
+  color #6B7280
+
+.storage-block-text
+  display flex
+  flex-direction column
+  gap 2px
+
+.storage-block-label
+  font-weight 500
+  color #1B1D2D
+  font-size 13px
+
+.storage-block-meta
+  color #6B7280
+  font-size 12px
+
+// ─── Main content ─────────────────────────────────────────────────────────
+.dashboard-main
+  flex 1 1 auto
+  overflow auto
+  padding 24px 32px
+  background #ffffff
+
+.dashboard-header
+  display flex
+  align-items center
+  justify-content space-between
+  margin-bottom 20px
+
+.dashboard-title
+  font-size 24px
+  font-weight 700
+  color #1B1D2D
+  margin 0
+
+.dashboard-actions
+  display flex
+  align-items center
+  gap 8px
+
+.icon-btn
+  width 36px
+  height 36px
+  border-radius 50%
+  border none
+  background transparent
+  color #6B7280
+  cursor pointer
+  display flex
+  align-items center
+  justify-content center
+  font-size 18px
+
+  &:hover
+    background rgba(41, 126, 242, 0.08)
+    color #1B1D2D
+
+// ─── Widget grid + cards ──────────────────────────────────────────────────
 .dashboard-grid
   min-height 100%
 
@@ -8,46 +192,103 @@
   height 100%
   display flex
   flex-direction column
-  background-color var(--paperBackgroundColor, white)
-  box-shadow 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08)
-  border-radius 6px
+  background #ffffff
+  border 1px solid #ebecf0
+  border-radius 12px
+  box-shadow 0 1px 2px rgba(27, 29, 45, 0.06)
   overflow hidden
+  transition box-shadow 0.12s
+
+  &:hover
+    box-shadow 0 2px 8px rgba(27, 29, 45, 0.08)
+
+  &:hover .widget-drag-handle::before
+    opacity 1
 
 .widget-drag-handle
   cursor move
   user-select none
-  background-color rgba(0,0,0,0.02)
+  padding 14px 18px 8px
+  display flex
+  align-items center
+  gap 8px
+  position relative
+
+  &::before
+    content '⋮⋮'
+    color #c2c4c7
+    font-size 14px
+    letter-spacing -2px
+    opacity 0
+    transition opacity 0.12s
+    position absolute
+    left 6px
+    top 50%
+    transform translateY(-50%)
+
+.widget-title
+  font-size 11px
+  font-weight 600
+  text-transform uppercase
+  letter-spacing 0.06em
+  color #6B7280
 
 .dashboard-widget-body
+  flex 1 1 auto
   overflow auto
+  padding 4px 8px 12px
 
-// react-grid-layout overrides for nicer drag feedback
+// ─── react-grid-layout placeholder ────────────────────────────────────────
 .react-grid-item.react-grid-placeholder
-  background rgba(0, 122, 255, 0.15) !important
-  border 2px dashed rgba(0, 122, 255, 0.4) !important
-  border-radius 6px
+  background rgba(41, 126, 242, 0.08) !important
+  border 2px dashed rgba(41, 126, 242, 0.4) !important
+  border-radius 12px
+  opacity 1 !important
 
-// Plain lists used inside widgets
+// ─── List items (Drive-style) ─────────────────────────────────────────────
 .dashboard-list
   list-style none
   padding 0
   margin 0
+  display flex
+  flex-direction column
 
 .dashboard-list-item
   display flex
   align-items center
-  gap 8px
-  padding 6px 8px
-  border-radius 4px
+  gap 12px
+  padding 8px 10px
+  border-radius 6px
   cursor pointer
-  transition background-color 0.1s
+  transition background 0.1s
 
   &:hover
-    background-color rgba(0,0,0,0.04)
+    background rgba(41, 126, 242, 0.08)
 
 .dashboard-list-icon
+  width 32px
+  height 32px
   flex-shrink 0
-  color var(--secondaryTextColor, #95999d)
+  display flex
+  align-items center
+  justify-content center
+  border-radius 6px
+
+.dashboard-list-icon.icon-file
+  background rgba(41, 126, 242, 0.1)
+  color #297EF2
+
+.dashboard-list-icon.icon-note
+  background rgba(245, 166, 35, 0.14)
+  color #f5a623
+
+.dashboard-list-icon.icon-shortcut
+  background rgba(124, 77, 255, 0.12)
+  color #7c4dff
+
+.dashboard-list-icon.icon-task
+  background rgba(245, 166, 35, 0.14)
+  color #f5a623
 
 .dashboard-list-text
   min-width 0
@@ -59,10 +300,22 @@
   white-space nowrap
   overflow hidden
   text-overflow ellipsis
+  color #1B1D2D
 
 .dashboard-list-secondary
   font-size 12px
-  color var(--secondaryTextColor, #95999d)
+  color #6B7280
   white-space nowrap
   overflow hidden
   text-overflow ellipsis
+  margin-top 2px
+
+.dashboard-empty
+  color #6B7280
+  font-size 13px
+  padding 16px 10px
+
+.dashboard-error
+  color #e53935
+  font-size 13px
+  padding 16px 10px
