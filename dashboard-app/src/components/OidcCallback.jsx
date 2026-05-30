@@ -13,7 +13,12 @@ const OidcCallback = () => {
 
   useEffect(() => {
     const run = async () => {
-      const params = new URLSearchParams(window.location.search)
+      // After the nginx 302 to /#/oidc/callback?…, the OAuth params land in
+      // the hash, not in window.location.search. Read whichever is non-empty.
+      const hashSearch = (window.location.hash || '').includes('?')
+        ? window.location.hash.slice(window.location.hash.indexOf('?'))
+        : ''
+      const params = new URLSearchParams(window.location.search || hashSearch)
       const code = params.get('code')
       const state = params.get('state')
       const pkce = JSON.parse(sessionStorage.getItem('linagora_pkce') || 'null')
