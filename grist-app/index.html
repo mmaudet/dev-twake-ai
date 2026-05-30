@@ -110,6 +110,7 @@
     async function cozyPost(path, body) {
       const res = await fetch('https://' + cozyDomain + path, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Authorization': 'Bearer ' + cozyToken,
           'Content-Type': 'application/vnd.api+json',
@@ -134,7 +135,6 @@
         renderBridgePane(
           'Tu dois d\'abord te connecter à Grist. Une nouvelle fenêtre va s\'ouvrir.',
           { label: 'Se connecter à Grist', onClick: () => {
-            const back = location.href;
             window.open(GRIST_BASE + '/', '_blank');
             renderBridgePane('Une fois connecté à Grist, recharge cette page.',
               { label: 'Recharger', onClick: () => location.reload() });
@@ -145,9 +145,13 @@
       if (!res.ok) throw new Error('GET /api/orgs → ' + res.status);
       const orgs = await res.json();
       if (!orgs.length) throw new Error('Aucune organisation Grist trouvée pour cet utilisateur.');
-      const org = orgs[0];
+      // Grist runs in single-org mode (GRIST_SINGLE_ORG=twake-dev). The /api/orgs
+      // response always includes the user's auto-provisioned "docs-N" personal org
+      // alongside the canonical one, so we must prefer the non-personal one
+      // (anything that isn't a Grist-managed personal sandbox).
+      const org = orgs.find(o => !/^docs-\d+$/.test(o.domain || '')) || orgs[0];
 
-      // 2. find first workspace
+      // 2. find first workspace in the chosen org
       res = await gristFetch('/api/orgs/' + org.id + '/workspaces');
       if (!res.ok) throw new Error('GET workspaces → ' + res.status);
       const workspaces = await res.json();
@@ -165,7 +169,12 @@
       const docIdRaw = await res.text();
       const docId = docIdRaw.replace(/^"|"$/g, '');
 
-      const docUrl = GRIST_BASE + '/o/' + org.domain + '/' + docId;
+      // The doc lives at this canonical URL — Grist resolves the right org itself.
+      const docUrl = GRIST_BASE + '/doc/' + docId;
+      // But we want the user to keep the Cozy bar, so the *visible* URL
+      // (in the shortcut + the post-create navigation) stays inside this
+      // coquille; the route #/doc/<docId> renders an iframe to docUrl.
+      const shellUrl = location.origin + '/#/doc/' + docId;
 
       // 4. materialize a shortcut in the Drive folder.
       // The {app, docId} metadata is what the cleanup-grist service reads
@@ -177,7 +186,7 @@
           attributes: {
             name: docName + '.url',
             dir_id: folderId,
-            url: docUrl,
+            url: shellUrl,
             metadata: {
               target: { app: 'grist', docId: docId, orgDomain: org.domain }
             }
@@ -185,19 +194,30 @@
         }
       });
 
-      // 5. send the user straight into the new doc
-      renderBridgePane('Ouverture du document Grist…');
-      location.replace(docUrl);
+      // 5. open the new doc in place — replace the URL (so a refresh lands
+      // on the same doc, and the Drive shortcut URL stays correct) and
+      // swap the bridge pane for the iframe. We can't navigate to shellUrl
+      // here because it's the same origin + same path + only the hash
+      // differs, so the browser would just update the hash without
+      // re-executing this script.
+      history.replaceState(null, '', '/#/doc/' + docId);
+      renderIframe(docUrl);
     }
 
-    // Hash router. Default: render the embedded Grist iframe.
-    const m = (location.hash || '').match(/^#\/bridge\/grist\/new\/([^/?#]+)/);
+    // Hash router.
+    // - #/bridge/grist/new/<folderId>  → create Grist doc + Drive shortcut, then redirect
+    // - #/doc/<docId>                  → embed a specific Grist doc in iframe
+    // - anything else                  → embed the Grist home in iframe
+    const hash = location.hash || '';
+    let m = hash.match(/^#\/bridge\/grist\/new\/([^/?#]+)/);
     if (m) {
       bridgeCreate(decodeURIComponent(m[1])).catch(err => {
         console.error(err);
         renderBridgePane('Erreur : ' + (err.message || err),
           { label: 'Retour à Grist', onClick: () => location.hash = '' });
       });
+    } else if ((m = hash.match(/^#\/doc\/([^/?#]+)/))) {
+      renderIframe(GRIST_BASE + '/doc/' + decodeURIComponent(m[1]));
     } else {
       renderIframe();
     }
