@@ -1,0 +1,34 @@
+@require 'components/forms.styl'
+@require 'settings/breakpoints.styl'
+@require 'settings/z-index.styl'
+
+.fil-topbar
+    display     flex
+    align-items center
+    margin-right 2rem
+    margin-left 2rem
+    flex 0 0 auto
+    min-height 2rem
+
+    +small-screen()
+        position relative
+        margin-right 0
+        margin-left 0
+        padding-right .5rem
+        padding-left .5rem
+        min-height 2rem
+
+        &.hidden-mobile
+            display none
+
+.fil-tab-item
+    &.fil-tab-item--selected
+        .fil-tab-icon
+            path
+                fill var(--primaryColor)
+
+    .fil-tab-icon
+        margin-right .5rem
+
+        path
+            fill: var(--shadow7)

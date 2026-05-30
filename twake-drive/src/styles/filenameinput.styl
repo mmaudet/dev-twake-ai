@@ -1,0 +1,14 @@
+@require 'components/forms.styl'
+
+.fil-file-name-input
+    @extend $form-text
+    display table-cell
+    width 100%
+    user-select text
+
+    input[type=text]
+        width   100%
+        padding .375rem
+
+        &:focus
+            background-color  var(--paperBackgroundColor)

@@ -1,0 +1,53 @@
+# NPM
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Build
+build/
+
+# Test
+coverage/
+.consoleUsageReporter.json
+
+# Stack
+./storage/
+storage/
+
+# Reports
+reports/
+
+# Default
+!.gitkeep
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Editors / IDEs
+.floo
+.flooignore
+.brackets.json
+.vscode
+.opencode
+
+# cozy-jobs-cli
+.token.json
+konnector-dev-config.json
+
+# SWC
+.swc
+
+# eslint
+.eslintcache
+
+# E2E test artifacts
+e2e/.auth-state.json
+playwright-report/
+test-results/

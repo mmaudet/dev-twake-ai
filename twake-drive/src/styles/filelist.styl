@@ -1,0 +1,559 @@
+@require 'components/table.styl'
+@require 'settings/z-index.styl'
+
+.fil-file-list-container
+    &:focus-visible
+        outline 0
+
+.fil-content-cell
+    display flex
+
+.fil-content-row
+    &:hover
+        .fil-content-file-select
+            opacity .5
+
+    &--center
+        justify-content center
+
+.fil-content-row-selected
+    @extend $table-row-selected
+
+.fil-content-row-actioned
+    background-color var(--contrastBackgroundColor)
+
+.fil-content-row-disabled
+    opacity .4
+    cursor default
+
+    &:hover
+        background inherit
+
+.fil-content-row-bigger
+    height rem(128)
+
+.fil-content-head-grid-view
+    display none
+
+.fil-content-column
+    border 0
+    position relative
+    margin .1rem auto
+    padding 1.2rem
+    text-align center
+    &:hover
+        background-color var(--contrastBackgroundColor)
+        .fil-content-file-select
+            opacity 1
+
+        .fil-content-file-action
+            opacity 1
+
+    &.fil-content-column-virtualized
+        box-sizing border-box
+        height 100%
+
+    .fil-content-file-select
+        position absolute
+        top 0
+        left 0
+        z-index $popover-index
+
+    .fil-content-file-action
+        position absolute
+        top 0
+        right .1rem
+        padding 0
+        margin 0
+        transform rotate(-90deg) translateY(-100%)
+        transform-origin top right
+        opacity 0
+
+    &--center
+        align-items center
+
+.fil-content-grid-item
+    margin .4rem
+
+.fil-content-column-selected
+    @extend $table-row-selected
+
+    .fil-content-file-select
+        opacity 1
+
+.fil-content-column-disabled
+    opacity .4
+    cursor default
+
+    &:hover
+        background inherit
+
+
+.fil-content-column-actioned
+    background-color var(--contrastBackgroundColor)
+
+
+    &:hover
+        background inherit
+
+.fil-content-ext
+    color var(--secondaryTextColor)
+
+.fil-content-header
+    &:first-child
+        padding .5rem
+
+.fil-content-header--capitalize
+    text-transform capitalize
+
+.fil-content-mobile-head
+    display none
+
+.fil-content-mobile-header
+    padding .5rem
+
+.fil-content-header-sortableasc:hover:after
+.fil-content-header-sortabledesc:hover:after
+.fil-content-header-sortasc:after
+.fil-content-header-sortdesc:after
+    display inline-block
+    content ''
+    margin-left .5rem
+    width .75rem
+    height .75rem
+
+.fil-content-header-sortableasc:hover:after
+    background transparent embedurl('../assets/icons/icon-arrow-up.svg') center .0625rem no-repeat
+.fil-content-header-sortabledesc:hover:after
+    background transparent embedurl('../assets/icons/icon-arrow-down.svg') center .0625rem no-repeat
+.fil-content-header-sortasc:after
+    background transparent embedurl('../assets/icons/icon-arrow-up-grey.svg') center .0625rem no-repeat
+.fil-content-header-sortdesc:after
+    background transparent embedurl('../assets/icons/icon-arrow-down-grey.svg') center .0625rem no-repeat
+
+.fil-content-header-sortdesc
+.fil-content-header-sortasc
+    color var(--primaryTextColor)
+
+.fil-content-header-sortdesc, .fil-content-header-sortasc, .fil-content-header-sortabledesc, .fil-content-header-sortableasc
+    cursor pointer
+
+column-width-large = 40%
+column-width-medium = 20%
+column-width-small = 15%
+column-width-thumbnail = 3rem
+column-width-thumbnail-bigger = 7rem
+
+.fil-content-file
+    flex 0 1 column-width-large
+    user-select none
+    background-position 0 center
+    background-repeat no-repeat
+    background-size rem(32) rem(32)
+
+    &-openable
+        cursor pointer
+
+.fil-content-header.fil-content-file
+    padding-left 0
+
+// @stylint off
+.fil-content-cell
+    &.fil-content-file
+        // When the cell is a filename (or new a directory name input), we don't want flex to shrink it
+        flex 0 0 "calc(%s - %s)" % (column-width-large column-width-thumbnail)
+        display flex
+        align-items center
+        padding   0 2rem 0 0
+        font-size      1rem
+        line-height    1.3
+        white-space    nowrap
+        overflow       hidden
+        color var(--primaryTextColor)
+        height 100%
+
+    &.fil-content-file-select
+        padding 0
+
+.fil-content-row-bigger
+    .fil-content-cell.fil-content-file
+        flex 0 1 "calc(%s - %s)" % (column-width-large column-width-thumbnail-bigger)
+
+    .fil-content-file-action
+        margin-right 0
+
+.fil-content-grid-view.fil-content-cell
+    white-space normal
+    height auto
+    padding-right 0
+    margin-top 0.6rem
+    text-align center
+    position relative
+
+    .fil-content-status
+        position absolute
+        bottom 1rem
+        right -.1rem
+        padding 0
+
+    .fil-file-filename-and-ext
+        display -webkit-box
+        -webkit-line-clamp 2
+        -webkit-box-orient vertical
+
+        overflow hidden
+        text-overflow ellipsis
+        white-space normal
+
+        max-width 6rem
+
+    .fil-file-path
+        max-width 6rem
+        margin 0 auto
+
+    .fil-file-description
+        max-width 6rem
+        overflow hidden
+
+.fil-file-thumbnail
+    position relative
+    flex 0 0 column-width-thumbnail - 1rem //width without padding
+    svg
+        display block
+
+    &--spinner
+        margin 0 .25rem !important // to override default cozy-ui margin
+
+.fil-file-thumbnail-image
+    object-fit cover
+
+.fil-content-shared
+    position    absolute
+    bottom .8rem
+    right .6rem
+
+.fil-content-shared-grid
+    position    absolute
+    bottom 0
+    right 0
+
+.fil-content-shared-vz
+    position    absolute
+    bottom 3px
+    right -6px
+
+.fil-content-date
+.fil-content-size
+    flex 0 0 column-width-small
+
+.fil-content-narrow
+    flex 0 0 column-width-thumbnail
+    text-align center
+
+.fil-content-status
+.fil-content-header-status
+    flex 0 0 column-width-medium
+
+    .fil-content-offline
+        display none
+        justify-content center
+        align-items center
+        width 1.25rem
+        margin-left 1rem
+        height 1.25rem
+        background-color var(--malachite)
+        border-radius 50%
+
+.fil-content-header-sharing-shortcut
+.fil-content-sharing-shortcut
+    width 1rem
+    padding 0
+    flex-shrink 0
+
+.fil-content-file-action
+.fil-content-header-action
+    display flex
+    justify-content flex-end
+    flex-shrink 0
+    width 3.8rem
+    padding-right .8rem
+    margin-right 2rem
+
+.fil-content-header-action
+    button
+        opacity 1
+        color var(--actionColorActive)
+
+.fil-content-file-select
+    flex       0 0 2rem
+    opacity    0
+    padding    0
+    text-align center
+    font-size  .875rem
+    cursor     default
+
+    [data-input="checkbox"] label
+        cursor default
+        padding 0
+
+.fil-content-file-action
+    opacity     0
+
+.fil-content-body--selectable
+    .fil-content-file-select
+        opacity .5
+
+.fil-content-row-selected
+    &:hover
+        .fil-content-file-select
+            opacity 1
+
+    .fil-content-file-select
+        opacity 1
+
+.fil-content-row-actioned
+    .fil-content-file-action
+        opacity 1
+
+.fil-file
+    display flex
+    flex-direction column
+    justify-content center
+    width 100%
+
+.fil-file-filename
+    flex 0 0 1.3rem
+
+.fil-file-filename-wrapper
+    display table
+    width   100%
+    border-collapse collapse
+
+    .fil-file-filename-and-ext
+        display table-cell
+        max-width 1px
+        width 100%
+        overflow hidden
+        text-overflow ellipsis
+        white-space nowrap
+
+    .fil-file-filename-spinner
+        display table-cell
+        white-space nowrap
+
+.fil-file-description
+    display flex
+    justify-content flex-start
+    align-items baseline
+
+    &--path
+        display contents !important // to take content width
+
+.fil-file-path
+.fil-file-infos
+.fil-file-description--path
+    color var(--actionColorActive)
+    font-size .75rem
+    text-decoration none
+
+.fil-file-path
+.fil-file-infos
+    flex 0 0 1rem
+    position relative
+    overflow hidden
+    text-overflow ellipsis
+    white-space nowrap
+
+    &:hover,
+    &:focus
+        text-decoration underline
+
+.fil-file-infos
+    display none
+
+.fil-file-shared
+    color var(--actionColorActive)
+    font-size .75rem
+
+.fil-file-shared-icon
+    margin-right .2rem
+
+@keyframes placeHolderShimmer
+    0%
+        background-position -20rem 0
+    80%
+        background-position 20rem 0
+    80.1%
+        background-position -20rem 0
+    100%
+        background-position -20rem 0
+
+.fil-content-file-placeholder
+    animation-duration        2s
+    animation-iteration-count infinite
+    animation-name            placeHolderShimmer
+    animation-timing-function linear
+    background-position -20rem 0
+    background-image linear-gradient(to right, var(--contrastBackgroundColor) 0%, white 50%, var(--contrastBackgroundColor) 100%)
+    background-size 20rem 2.5rem
+    background-repeat no-repeat
+    background-color var(--contrastBackgroundColor)
+    border-radius .15rem
+    height   .75rem
+    max-width    100%
+    position relative
+
+.fil-content-file .fil-content-file-placeholder:before
+    content ""
+    display inline-block
+    width   2rem
+    height   2rem
+    background inherit
+    animation inherit
+    border-radius inherit
+    position absolute
+    right 100%
+    top -80%
+    margin-right 1rem
+
+.fil-content-file .fil-content-file-placeholder:before
+    animation-delay 0s
+
+.fil-content-file .fil-content-file-placeholder
+    animation-delay .1s
+
+.fil-content-date .fil-content-file-placeholder
+    animation-delay .5s
+
+.fil-content-size .fil-content-file-placeholder
+    animation-delay .7s
+
+.fil-content-status .fil-content-file-placeholder
+    animation-delay 1.1s
+
+.fil-content-sharestatus
+    cursor pointer
+    &--disabled
+        cursor default
+
+.fil-content-file-action
+    opacity 1
+    &--disabled
+        opacity .4
+        button
+            cursor default
+
+.fil-content-row-actioned
+    .fil-content-file-action
+        button
+            background var(--actionColorDisabled)
+            opacity 1
+
+.fil-content-body
+    padding-bottom calc(56px + 4rem) // Claudy Fab size + margins around
+
+// -- responsive
+
++medium-screen()
+    .fil-content-table-selection
+        .fil-content-body
+            margin-bottom 3rem
+
+    .fil-content-body--withFabActive
+        padding-bottom calc(56px + 2rem) // Fab size + margins around
+
++small-screen()
+// @stylint on
+    .fil-content-body:not(.fil-content-body--withFabActive)
+        padding-bottom 0
+
+    .fil-content-row
+        height 4rem
+
+    .fil-content-row-bigger
+        height rem(128)
+
+    .fil-content-head
+    .fil-content-date
+    .fil-content-size
+        display none
+
+    .fil-content-mobile-head
+        display flex
+        flex-basis auto
+
+    .fil-content-mobile-header.fil-content-header-sortasc
+    .fil-content-mobile-header.fil-content-header-sortdesc
+        flex 1 1 auto
+
+    .fil-content-header-action
+    .fil-content-file-action
+        padding-right .2rem
+        margin-right 1rem
+        flex 0
+        box-sizing content-box
+        width 100%
+
+    .fil-content-cell.fil-content-file
+    .fil-content-row-bigger .fil-content-cell.fil-content-file
+        flex 1 1 auto
+
+    .fil-content-status
+        display    block
+        flex       0 0 auto
+        padding    0
+
+        .fil-content-offline
+            display inline-flex
+
+        .fil-content-sharestatus
+            display none
+
+    .fil-content-cell
+        &.fil-content-status
+            padding 0
+
+        &.fil-content-file
+            padding-right 0
+
+        &.fil-content-file-select
+            display none
+            padding 0 0 0 .25rem
+
+    .fil-content-body--selectable
+        .fil-content-file-select
+            display  block
+            flex     0 0 5%
+
+        .fil-content-file-action
+            opacity 0
+
+        .fil-file-thumbnail
+            padding .875rem 1rem .875rem .25rem
+
+    .fil-file-infos
+        display flex
+
+    .fil-file-path
+        &:hover,
+        &:focus
+            text-decoration none
+
+    .fil-content-column
+        width -webkit-fill-available
+        display flex
+        flex-direction column
+        align-items center
+
+        &:nth-child(odd)
+            margin-right .3rem
+
+        .fil-content-file-select
+            top 0
+            left 0
+
+        .fil-content-file-action
+            opacity 1
+
+        .fil-file-infos
+            display none

@@ -1,0 +1,112 @@
+import React from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+
+import { useClient } from 'cozy-client'
+import flag from 'cozy-flags'
+import { useAlert } from 'cozy-ui/transpiled/react/providers/Alert'
+import { useBreakpoints } from 'cozy-ui/transpiled/react/providers/Breakpoints'
+import { useI18n } from 'twake-i18n'
+
+import { useViewSwitcherContext } from '@/lib/ViewSwitcherContext'
+import { AddFolderCard } from '@/modules/filelist/AddFolderCard'
+import { AddFolderRow } from '@/modules/filelist/AddFolderRow'
+import {
+  isTypingNewFolderName,
+  hideNewFolderInput
+} from '@/modules/filelist/duck'
+import AddFolderRowVz from '@/modules/filelist/virtualized/AddFolderRow'
+import { createFolder } from '@/modules/navigation/duck'
+import { useNewItemHighlightContext } from '@/modules/upload/NewItemHighlightProvider'
+
+export const AddFolder = ({ visible, onSubmit, onAbort }) => {
+  const { t } = useI18n()
+  const { showAlert } = useAlert()
+  const { isMobile } = useBreakpoints()
+  const { viewType } = useViewSwitcherContext()
+
+  if (!visible) {
+    return null
+  }
+
+  const Comp =
+    viewType === 'grid'
+      ? AddFolderCard
+      : flag('drive.virtualization.enabled') && !isMobile
+        ? AddFolderRowVz
+        : AddFolderRow
+
+  return (
+    <Comp
+      onSubmit={name => onSubmit(name, showAlert, t)}
+      onAbort={accidental => onAbort(accidental, showAlert, t)}
+    />
+  )
+}
+
+const AddFolderWithState = ({
+  currentFolderId,
+  driveId,
+  afterSubmit,
+  afterAbort,
+  addItems
+}) => {
+  const client = useClient()
+  const dispatch = useDispatch()
+  const visible = useSelector(isTypingNewFolderName)
+
+  const onSubmit = (name, showAlert, t) =>
+    dispatch(async dispatch =>
+      dispatch(
+        createFolder(
+          client,
+          name,
+          currentFolderId,
+          { showAlert, t },
+          driveId,
+          addItems
+        )
+      ).then(() => {
+        afterSubmit?.() // eslint-disable-line promise/always-return
+      })
+    )
+
+  const onAbort = (accidental, showAlert, t) => {
+    if (accidental) {
+      showAlert({
+        message: t('alert.folder_abort'),
+        severity: 'secondary',
+        noClickAway: true
+      })
+    }
+    afterAbort?.()
+  }
+
+  return <AddFolder visible={visible} onSubmit={onSubmit} onAbort={onAbort} />
+}
+
+const AddFolderWithAfter = ({ refreshFolderContent, ...props }) => {
+  const dispatch = useDispatch()
+  const { addItems } = useNewItemHighlightContext()
+
+  const handleAfterSubmit = () => {
+    if (refreshFolderContent) {
+      refreshFolderContent()
+    }
+    dispatch(hideNewFolderInput())
+  }
+
+  const handleAfterAbort = () => {
+    dispatch(hideNewFolderInput())
+  }
+
+  return (
+    <AddFolderWithState
+      afterSubmit={handleAfterSubmit}
+      afterAbort={handleAfterAbort}
+      addItems={addItems}
+      {...props}
+    />
+  )
+}
+
+export default AddFolderWithAfter

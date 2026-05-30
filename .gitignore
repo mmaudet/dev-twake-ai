@@ -5,6 +5,12 @@
 /twake-space-app-build/node_modules/
 /twake-space-app-build/dist/
 
+# Twake Drive fork — build outputs
+/twake-drive/node_modules/
+/twake-drive/build/
+/twake-drive/dist/
+/twake-drive/.cache/
+
 # Misc
 *.log
 .DS_Store

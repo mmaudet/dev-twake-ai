@@ -1,0 +1,81 @@
+import React, { FC, useEffect, useState } from 'react'
+import { useLocation, useParams } from 'react-router-dom'
+
+import { useClient } from 'cozy-client'
+import { fetchURL } from 'cozy-client/dist/models/note'
+import Empty from 'cozy-ui/transpiled/react/Empty'
+import Icon from 'cozy-ui/transpiled/react/Icon'
+import SadCozyIcon from 'cozy-ui/transpiled/react/Icons/SadCozy'
+import Spinner from 'cozy-ui/transpiled/react/Spinner'
+import { useI18n } from 'twake-i18n'
+
+import { joinPath } from '@/lib/path'
+import { DummyLayout } from '@/modules/layout/DummyLayout'
+
+const PublicNoteRedirect: FC = () => {
+  const { t } = useI18n()
+  const { fileId, driveId } = useParams()
+  const { search } = useLocation()
+  const client = useClient()
+
+  const [noteUrl, setNoteUrl] = useState<string | null>(null)
+  const [fetchStatus, setFetchStatus] = useState<
+    'failed' | 'loading' | 'pending' | 'loaded'
+  >('pending')
+
+  useEffect(() => {
+    const fetchNoteUrl = async (fileId: string): Promise<void> => {
+      setFetchStatus('loading')
+
+      try {
+        // Inside notes, we need to add / at the end of /public/ or /preview/ to avoid 409 error
+        const searchParams = new URLSearchParams(search)
+        const returnUrl = searchParams.get('returnUrl')
+
+        const pathname =
+          location.pathname === '/'
+            ? '/public/'
+            : joinPath(location.pathname, '')
+        const url = await fetchURL(
+          client,
+          {
+            id: fileId
+          },
+          {
+            driveId,
+            pathname,
+            returnUrl
+          }
+        )
+        setNoteUrl(url)
+        setFetchStatus('loaded')
+      } catch (_error) {
+        setFetchStatus('failed')
+      }
+    }
+
+    if (fileId) {
+      void fetchNoteUrl(fileId)
+    }
+  }, [search, fileId, driveId, client])
+
+  if (noteUrl) {
+    // eslint-disable-next-line react-hooks/immutability
+    window.location.href = noteUrl
+  }
+
+  return (
+    <DummyLayout>
+      {fetchStatus === 'failed' && (
+        <Empty
+          icon={<Icon icon={SadCozyIcon} color="var(--primaryColor)" />}
+          title={t('PublicNoteRedirect.error.title')}
+          text={t('PublicNoteRedirect.error.subtitle')}
+        />
+      )}
+      {fetchStatus !== 'failed' && <Spinner size="xxlarge" middle noMargin />}
+    </DummyLayout>
+  )
+}
+
+export { PublicNoteRedirect }
