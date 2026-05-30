@@ -23,6 +23,33 @@
       border: 0;
       display: block;
     }
+    .bridge-pane {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      font-family: system-ui, sans-serif;
+      color: #333;
+      gap: 1.5em;
+    }
+    .bridge-pane .spinner {
+      width: 48px; height: 48px;
+      border: 4px solid #e0e0e0;
+      border-top-color: #16B378;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .bridge-pane button {
+      padding: 0.6em 1.4em;
+      font-size: 1em;
+      border: 0;
+      border-radius: 4px;
+      background: #16B378;
+      color: white;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -36,8 +63,142 @@
        data-cozy-app-name-prefix=""
        data-cozy-app-editor="{{.AppEditor}}"
        data-cozy-icon-path="icon.png">
-    <iframe src="https://grist.dev-twake.maudet.cloud/" title="Grist"></iframe>
   </div>
   <script src="bar.js" defer></script>
+  <script>
+  (function () {
+    const GRIST_BASE = 'https://grist.dev-twake.maudet.cloud';
+    const root = document.querySelector('[role=application]');
+    const cozyToken = root.dataset.cozyToken;
+    const cozyDomain = root.dataset.cozyDomain;
+
+    function renderIframe(src) {
+      root.innerHTML = '';
+      const f = document.createElement('iframe');
+      f.src = src || GRIST_BASE + '/';
+      f.title = 'Grist';
+      root.appendChild(f);
+    }
+
+    function renderBridgePane(msg, action) {
+      root.innerHTML = '';
+      const div = document.createElement('div');
+      div.className = 'bridge-pane';
+      const sp = document.createElement('div');
+      sp.className = 'spinner';
+      const txt = document.createElement('div');
+      txt.textContent = msg;
+      div.appendChild(sp);
+      div.appendChild(txt);
+      if (action) {
+        const btn = document.createElement('button');
+        btn.textContent = action.label;
+        btn.onclick = action.onClick;
+        div.appendChild(btn);
+      }
+      root.appendChild(div);
+    }
+
+    async function gristFetch(path, opts = {}) {
+      const res = await fetch(GRIST_BASE + path, Object.assign({
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }
+      }, opts));
+      return res;
+    }
+
+    async function cozyPost(path, body) {
+      const res = await fetch('https://' + cozyDomain + path, {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + cozyToken,
+          'Content-Type': 'application/vnd.api+json',
+          'Accept': 'application/vnd.api+json'
+        },
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error('cozy POST ' + path + ' → ' + res.status + ' ' + txt);
+      }
+      return res.json();
+    }
+
+    async function bridgeCreate(folderId) {
+      renderBridgePane('Création du document Grist…');
+
+      // 1. ensure user has a Grist session — list orgs
+      let res = await gristFetch('/api/orgs');
+      if (res.status === 401 || res.status === 403) {
+        // No Grist session: send user to Grist to log in, with return-here in mind.
+        renderBridgePane(
+          'Tu dois d\'abord te connecter à Grist. Une nouvelle fenêtre va s\'ouvrir.',
+          { label: 'Se connecter à Grist', onClick: () => {
+            const back = location.href;
+            window.open(GRIST_BASE + '/', '_blank');
+            renderBridgePane('Une fois connecté à Grist, recharge cette page.',
+              { label: 'Recharger', onClick: () => location.reload() });
+          } }
+        );
+        return;
+      }
+      if (!res.ok) throw new Error('GET /api/orgs → ' + res.status);
+      const orgs = await res.json();
+      if (!orgs.length) throw new Error('Aucune organisation Grist trouvée pour cet utilisateur.');
+      const org = orgs[0];
+
+      // 2. find first workspace
+      res = await gristFetch('/api/orgs/' + org.id + '/workspaces');
+      if (!res.ok) throw new Error('GET workspaces → ' + res.status);
+      const workspaces = await res.json();
+      if (!workspaces.length) throw new Error('Aucun workspace Grist disponible.');
+      const ws = workspaces[0];
+
+      // 3. create the doc
+      const docName = 'Sans titre';
+      res = await gristFetch('/api/workspaces/' + ws.id + '/docs', {
+        method: 'POST',
+        body: JSON.stringify({ name: docName })
+      });
+      if (!res.ok) throw new Error('POST doc → ' + res.status + ' ' + await res.text());
+      // Grist returns a quoted JSON string with the doc id
+      const docIdRaw = await res.text();
+      const docId = docIdRaw.replace(/^"|"$/g, '');
+
+      const docUrl = GRIST_BASE + '/o/' + org.domain + '/' + docId;
+
+      // 4. materialize a shortcut in the Drive folder
+      await cozyPost('/shortcuts', {
+        data: {
+          type: 'io.cozy.files.shortcuts',
+          attributes: {
+            name: docName + '.url',
+            dir_id: folderId,
+            url: docUrl,
+            metadata: {
+              target: { app: 'grist' }
+            }
+          }
+        }
+      });
+
+      // 5. send the user straight into the new doc
+      renderBridgePane('Ouverture du document Grist…');
+      location.replace(docUrl);
+    }
+
+    // Hash router. Default: render the embedded Grist iframe.
+    const m = (location.hash || '').match(/^#\/bridge\/grist\/new\/([^/?#]+)/);
+    if (m) {
+      bridgeCreate(decodeURIComponent(m[1])).catch(err => {
+        console.error(err);
+        renderBridgePane('Erreur : ' + (err.message || err),
+          { label: 'Retour à Grist', onClick: () => location.hash = '' });
+      });
+    } else {
+      renderIframe();
+    }
+  })();
+  </script>
 </body>
 </html>
