@@ -114,15 +114,70 @@ async function renameFile({ cozyDomain, cozyToken, fileId }, newName) {
   return body.data.attributes.name
 }
 
+const titleBarStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.5em',
+  padding: '0.5em 1em',
+  borderBottom: '1px solid #e6e6e6',
+  background: '#f5f5fb',
+  fontFamily: 'system-ui, sans-serif',
+  flex: '0 0 auto',
+  minHeight: '2.5em',
+  boxSizing: 'border-box'
+}
+const titleInputStyle = {
+  flex: '1 1 auto',
+  border: '1px solid transparent',
+  borderRadius: 4,
+  padding: '0.3em 0.6em',
+  fontSize: '1em',
+  background: 'transparent',
+  color: '#333',
+  outline: 'none',
+  minWidth: 0
+}
+const extLabelStyle = {
+  color: '#999',
+  fontSize: '0.85em',
+  fontFamily: 'monospace'
+}
+
+function TitleBar({ value, onCommit }) {
+  const [draft, setDraft] = useState(value)
+  useEffect(() => { setDraft(value) }, [value])
+  const commit = () => {
+    const next = sanitizeName(draft)
+    if (next && next !== value) onCommit(next)
+    else setDraft(value)
+  }
+  return React.createElement('div', { style: titleBarStyle },
+    React.createElement('input', {
+      style: titleInputStyle,
+      value: draft,
+      onChange: e => setDraft(e.target.value),
+      onBlur: commit,
+      onKeyDown: e => {
+        if (e.key === 'Enter') { e.preventDefault(); e.target.blur() }
+        else if (e.key === 'Escape') { e.preventDefault(); setDraft(value); e.target.blur() }
+      },
+      placeholder: 'Sans titre',
+      'aria-label': 'Nom du dessin'
+    }),
+    React.createElement('span', { style: extLabelStyle }, EXTENSION)
+  )
+}
+
 function App() {
   const ctx = getEditorCtx()
   const [initial, setInitial] = useState(null)
   const [excalApi, setExcalApi] = useState(null)
+  const [title, setTitle] = useState('')
   const saveTimer = useRef(null)
   const lastSavedJson = useRef('')
   // The Drive file name is the single source of truth. We mirror it into
-  // the Excalidraw header on mount, and PATCH the file when the user
-  // edits it via the header.
+  // the local title state on mount, and PATCH the file when the user
+  // edits it via the title bar above the editor.
   const currentDriveName = useRef('')
 
   useEffect(() => {
@@ -130,6 +185,7 @@ function App() {
       .then(([meta, scene]) => {
         currentDriveName.current = meta.attributes.name
         const driveTitle = stripExt(meta.attributes.name)
+        setTitle(driveTitle)
         const appState = { ...(scene.appState || {}), collaborators: new Map() }
         appState.name = driveTitle
         // Re-stringify with the synced name so the very first save (if
@@ -246,12 +302,48 @@ function App() {
     }, 'Chargement…')
   }
 
-  return React.createElement(Excalidraw, {
-    initialData: initial,
-    excalidrawAPI: setExcalApi,
-    onChange: scheduleSave,
-    langCode: 'fr-FR'
-  })
+  const onTitleCommit = async next => {
+    setTitle(next)
+    // Push the new name into Excalidraw's appState so subsequent
+    // serializations carry it too. excalApi may not be set yet on the
+    // very first render — that's fine, the load path already seeded it.
+    if (excalApi) {
+      excalApi.updateScene({ appState: { ...excalApi.getAppState(), name: next } })
+    }
+    try {
+      const got = await renameFile(ctx, next + EXTENSION)
+      currentDriveName.current = got
+    } catch (e) {
+      console.warn('[excalidraw] rename failed', e.message || e)
+      // Roll back the title field if the rename was rejected.
+      setTitle(stripExt(currentDriveName.current))
+    }
+  }
+
+  return React.createElement('div', {
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      height: '100%',
+      width: '100%'
+    }
+  },
+    React.createElement(TitleBar, { value: title, onCommit: onTitleCommit }),
+    React.createElement('div', {
+      style: {
+        flex: '1 1 auto',
+        minHeight: 0,
+        position: 'relative'
+      }
+    },
+      React.createElement(Excalidraw, {
+        initialData: initial,
+        excalidrawAPI: setExcalApi,
+        onChange: scheduleSave,
+        langCode: 'fr-FR'
+      })
+    )
+  )
 }
 
 const mount = document.getElementById('excalidraw-root')
