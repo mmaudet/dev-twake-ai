@@ -10,6 +10,8 @@ import { useI18n } from 'twake-i18n'
 
 import AddFolderItem from '@/modules/drive/Toolbar/components/AddFolderItem'
 import CreateDocsItem from '@/modules/drive/Toolbar/components/CreateDocsItem'
+import CreateExcalidrawItem from '@/modules/drive/Toolbar/components/CreateExcalidrawItem'
+import CreateGristItem from '@/modules/drive/Toolbar/components/CreateGristItem'
 import CreateNoteItem from '@/modules/drive/Toolbar/components/CreateNoteItem'
 import CreateOnlyOfficeItem from '@/modules/drive/Toolbar/components/CreateOnlyOfficeItem'
 import CreateShortcut from '@/modules/drive/Toolbar/components/CreateShortcut'
@@ -75,6 +77,20 @@ const AddMenuContent = forwardRef(
         )}
         {!isPublic && flag('drive.lasuitedocs.enabled') && (
           <CreateDocsItem
+            displayedFolder={displayedFolder}
+            isReadOnly={isReadOnly}
+            onClick={onClick}
+          />
+        )}
+        {!isPublic && (
+          <CreateGristItem
+            displayedFolder={displayedFolder}
+            isReadOnly={isReadOnly}
+            onClick={onClick}
+          />
+        )}
+        {!isPublic && (
+          <CreateExcalidrawItem
             displayedFolder={displayedFolder}
             isReadOnly={isReadOnly}
             onClick={onClick}
