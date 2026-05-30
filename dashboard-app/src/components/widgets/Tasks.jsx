@@ -18,7 +18,9 @@ const fetchKanbnTasks = async apiKey => {
   const wsList = Array.isArray(workspaces) ? workspaces : (workspaces.data || workspaces.items || [])
 
   const allTasks = []
-  for (const ws of wsList) {
+  for (const item of wsList) {
+    // /workspaces returns [{ role, workspace: {publicId, ...} }] in v0.5.x
+    const ws = item.workspace || item
     const wsId = ws.publicId || ws.id
     if (!wsId) continue
     try {
