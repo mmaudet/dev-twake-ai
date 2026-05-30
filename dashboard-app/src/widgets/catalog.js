@@ -1,6 +1,8 @@
 import RecentFiles from 'src/components/widgets/RecentFiles'
 import RecentNotes from 'src/components/widgets/RecentNotes'
 import Tasks from 'src/components/widgets/Tasks'
+import MailLinagora from 'src/components/widgets/MailLinagora'
+import CalendarLinagora from 'src/components/widgets/CalendarLinagora'
 
 // The widget catalogue. Each entry describes a widget that can be installed
 // on the dashboard. Order in this object drives the order in the "Gérer les
@@ -58,24 +60,24 @@ export const WIDGET_CATALOG = {
   },
   mail: {
     id: 'mail',
-    name: 'Mail (Twake Linagora)',
-    description: 'Les 10 derniers mails de votre boîte. À brancher sur Twake Mail.',
+    name: 'Mail Twake Linagora',
+    description: 'Vos 10 derniers mails depuis Twake Mail.',
     icon: 'email',
-    accent: 'icon-shortcut',
-    category: 'coming-soon',
-    Component: null,
+    accent: 'icon-mail',
+    category: 'external',
+    Component: MailLinagora,
     defaultLayout: { w: 6, h: 7, minW: 3, minH: 4 },
     needsConfig: true,
     enabledByDefault: false
   },
   calendar: {
     id: 'calendar',
-    name: 'Calendrier (Twake Linagora)',
-    description: 'Vos rendez-vous du jour avec navigation jour par jour.',
+    name: 'Agenda Twake Linagora',
+    description: 'Vos événements du jour avec navigation jour par jour.',
     icon: 'calendar',
-    accent: 'icon-task',
-    category: 'coming-soon',
-    Component: null,
+    accent: 'icon-calendar',
+    category: 'external',
+    Component: CalendarLinagora,
     defaultLayout: { w: 6, h: 7, minW: 3, minH: 4 },
     needsConfig: true,
     enabledByDefault: false

@@ -48,7 +48,20 @@ const init = () => {
   )
 }
 
+// Path-based callback bridge — cozy-stack serves index.html for any path
+// inside our app slug, but the React app uses a hash router. If the OIDC
+// provider redirected us back to a non-hash path with query params, rewrite
+// the URL to the hash equivalent so the router renders the right page.
+const bridgePathCallback = () => {
+  const { pathname, search, hash } = window.location
+  if (hash) return
+  if (pathname === '/oidc/callback' || pathname.endsWith('/oidc/callback')) {
+    window.history.replaceState({}, '', `/#/oidc/callback${search}`)
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+  bridgePathCallback()
   init()
 })
 
