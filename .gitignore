@@ -5,6 +5,10 @@
 /twake-space-app-build/node_modules/
 /twake-space-app-build/dist/
 
+# Build artifacts of the excalidraw editor bundle
+/excalidraw-app-build/node_modules/
+/excalidraw-app-build/dist/
+
 # Misc
 *.log
 .DS_Store

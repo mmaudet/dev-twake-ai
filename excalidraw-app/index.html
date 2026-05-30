@@ -9,6 +9,7 @@
   {{.CozyFonts}}
   {{.ThemeCSS}}
   <link rel="stylesheet" href="bar.css">
+  <link rel="stylesheet" href="editor.css">
   <style>
     html, body { margin: 0; padding: 0; height: 100%; background: #faf9f5; }
     body.has-banner { display: flex; flex-direction: column; }
@@ -16,12 +17,43 @@
       flex: 1 1 auto;
       min-height: 0;
       width: 100%;
+      display: flex;
+      flex-direction: column;
     }
-    [role=application] > iframe {
+    [role=application] > iframe,
+    [role=application] > #excalidraw-root {
       width: 100%;
-      height: 100%;
+      flex: 1 1 auto;
+      min-height: 0;
       border: 0;
       display: block;
+    }
+    .bridge-pane {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      font-family: system-ui, sans-serif;
+      color: #333;
+      gap: 1.5em;
+    }
+    .bridge-pane .spinner {
+      width: 48px; height: 48px;
+      border: 4px solid #e0e0e0;
+      border-top-color: #6965DB;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .bridge-pane button {
+      padding: 0.6em 1.4em;
+      font-size: 1em;
+      border: 0;
+      border-radius: 4px;
+      background: #6965DB;
+      color: white;
+      cursor: pointer;
     }
   </style>
 </head>
@@ -36,8 +68,91 @@
        data-cozy-app-name-prefix=""
        data-cozy-app-editor="{{.AppEditor}}"
        data-cozy-icon-path="icon.svg">
-    <iframe src="https://excalidraw.dev-twake.maudet.cloud/" title="Excalidraw"></iframe>
   </div>
   <script src="bar.js" defer></script>
+  <script>
+  (function () {
+    const root = document.querySelector('[role=application]');
+    const cozyToken = root.dataset.cozyToken;
+    const cozyDomain = root.dataset.cozyDomain;
+    const EMPTY_SCENE = '{"type":"excalidraw","version":2,"source":"https://excalidraw.com","elements":[],"appState":{},"files":{}}';
+
+    function renderIframe(src) {
+      root.innerHTML = '';
+      const f = document.createElement('iframe');
+      f.src = src || 'https://excalidraw.dev-twake.maudet.cloud/';
+      f.title = 'Excalidraw';
+      root.appendChild(f);
+    }
+
+    function renderBridgePane(msg, action) {
+      root.innerHTML = '';
+      const div = document.createElement('div');
+      div.className = 'bridge-pane';
+      const sp = document.createElement('div'); sp.className = 'spinner';
+      const txt = document.createElement('div'); txt.textContent = msg;
+      div.appendChild(sp); div.appendChild(txt);
+      if (action) {
+        const btn = document.createElement('button');
+        btn.textContent = action.label;
+        btn.onclick = action.onClick;
+        div.appendChild(btn);
+      }
+      root.appendChild(div);
+    }
+
+    async function bridgeCreate(folderId) {
+      renderBridgePane('Création du dessin Excalidraw…');
+      // Create an .excalidraw file pre-populated with an empty scene so the
+      // editor has something to parse on first load.
+      const name = 'Sans titre.excalidraw';
+      const url = `https://${cozyDomain}/files/${folderId}?Name=${encodeURIComponent(name)}&Type=file&Executable=false`;
+      const res = await fetch(url, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Authorization': 'Bearer ' + cozyToken,
+          'Content-Type': 'application/json'
+        },
+        body: EMPTY_SCENE
+      });
+      if (!res.ok) throw new Error('POST /files → ' + res.status + ' ' + await res.text());
+      const body = await res.json();
+      const fileId = body.data.id;
+      history.replaceState(null, '', '/#/edit/' + fileId);
+      mountEditor(fileId);
+    }
+
+    function mountEditor(fileId) {
+      root.innerHTML = '';
+      const editorRoot = document.createElement('div');
+      editorRoot.id = 'excalidraw-root';
+      root.appendChild(editorRoot);
+      // The bundled editor (editor.js) picks up these values from the global.
+      window.__excalidrawEditor = { cozyDomain, cozyToken, fileId };
+      const s = document.createElement('script');
+      s.src = 'editor.js';
+      document.body.appendChild(s);
+    }
+
+    // Hash router.
+    // - #/bridge/excalidraw/new/<folderId>  → create empty file + open editor
+    // - #/edit/<fileId>                     → load editor on that file
+    // - anything else                       → iframe to the standalone Excalidraw (no Drive save)
+    const hash = location.hash || '';
+    let m = hash.match(/^#\/bridge\/excalidraw\/new\/([^/?#]+)/);
+    if (m) {
+      bridgeCreate(decodeURIComponent(m[1])).catch(err => {
+        console.error(err);
+        renderBridgePane('Erreur : ' + (err.message || err),
+          { label: 'Retour', onClick: () => location.hash = '' });
+      });
+    } else if ((m = hash.match(/^#\/edit\/([^/?#]+)/))) {
+      mountEditor(decodeURIComponent(m[1]));
+    } else {
+      renderIframe();
+    }
+  })();
+  </script>
 </body>
 </html>

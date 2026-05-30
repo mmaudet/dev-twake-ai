@@ -48,9 +48,9 @@
       "verbs": ["GET"]
     },
     "files": {
-      "description": "Required by cozy-bar (recent files / search)",
+      "description": "Required to materialize the .excalidraw file from Drive's + Créer menu, and to save scene updates back via PUT /files/<id>.",
       "type": "io.cozy.files",
-      "verbs": ["GET", "POST"]
+      "verbs": ["GET", "POST", "PUT", "PATCH"]
     }
   },
   "routes": {
