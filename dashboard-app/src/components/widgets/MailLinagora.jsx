@@ -64,7 +64,7 @@ const MailLinagora = () => {
         <li
           key={e.id}
           className="dashboard-list-item"
-          onClick={() => window.open('https://mail.twake.app/', '_blank')}
+          onClick={() => window.open('https://mmaudet-mail.twake.linagora.com/', '_blank')}
         >
           <span className="dashboard-list-icon icon-mail">
             <Icon icon="email" size={18} />

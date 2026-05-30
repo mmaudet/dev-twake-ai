@@ -87,7 +87,7 @@ const CalendarLinagora = () => {
             <li
               key={e.uid || `${e.start}-${e.summary}`}
               className="dashboard-list-item"
-              onClick={() => window.open('https://calendar.twake.app/', '_blank')}
+              onClick={() => window.open('https://mmaudet-calendar.twake.linagora.com/', '_blank')}
             >
               <span className="dashboard-list-icon icon-calendar">
                 <Icon icon="calendar" size={18} />
