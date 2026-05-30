@@ -167,7 +167,10 @@
 
       const docUrl = GRIST_BASE + '/o/' + org.domain + '/' + docId;
 
-      // 4. materialize a shortcut in the Drive folder
+      // 4. materialize a shortcut in the Drive folder.
+      // The {app, docId} metadata is what the cleanup-grist service reads
+      // when this shortcut is later purged from the Drive trash, so that
+      // it can DELETE the matching Grist doc.
       await cozyPost('/shortcuts', {
         data: {
           type: 'io.cozy.files.shortcuts',
@@ -176,7 +179,7 @@
             dir_id: folderId,
             url: docUrl,
             metadata: {
-              target: { app: 'grist' }
+              target: { app: 'grist', docId: docId, orgDomain: org.domain }
             }
           }
         }
