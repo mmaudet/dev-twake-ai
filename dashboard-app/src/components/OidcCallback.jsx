@@ -13,7 +13,6 @@ const OidcCallback = () => {
 
   useEffect(() => {
     const run = async () => {
-      // Path-based callback: ?code=...&state=...
       const params = new URLSearchParams(window.location.search)
       const code = params.get('code')
       const state = params.get('state')
@@ -31,13 +30,17 @@ const OidcCallback = () => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ code, code_verifier: pkce.code_verifier })
+          body: JSON.stringify({
+            code,
+            code_verifier: pkce.code_verifier,
+            widget: pkce.widget
+          })
         })
         const json = await res.json()
         if (!res.ok || !json.ok) throw new Error(json.error || `HTTP ${res.status}`)
         sessionStorage.removeItem('linagora_pkce')
-        Alerter.success('Connecté à LINAGORA')
-        // Hash routing: clean URL to /#/
+        const widgetLabel = pkce.widget === 'mail' ? 'Mail LINAGORA' : 'Agenda LINAGORA'
+        Alerter.success(`${widgetLabel} connecté`)
         window.history.replaceState({}, '', '/#/')
         navigate('/')
       } catch (e) {

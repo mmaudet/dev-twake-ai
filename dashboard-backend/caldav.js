@@ -4,31 +4,28 @@ import { getValidAccessToken } from './tokens.js'
 
 const CAL_BASE = process.env.CAL_BASE || 'https://tcalendar.linagora.com'
 
-let cachedUserId = null
-let cachedUserIdFor = null
-let cachedCalendarHrefs = null
-let cachedCalendarsFor = null
-
-const escapeXml = s => String(s).replace(/[<>&'"]/g, c => ({
-  '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;'
-}[c]))
+const userIdCache = new Map()      // accessToken → userId
+const calendarsCache = new Map()   // accessToken → [{id, href, displayname, isOwn}]
 
 const getUserId = async accessToken => {
-  if (cachedUserId && cachedUserIdFor === accessToken) return cachedUserId
+  if (userIdCache.has(accessToken)) return userIdCache.get(accessToken)
   const res = await fetch(`${CAL_BASE}/api/user`, {
     headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' }
   })
   if (!res.ok) throw new Error(`tcalendar /api/user failed: ${res.status}`)
   const user = await res.json()
-  cachedUserId = user.id || user._id
-  cachedUserIdFor = accessToken
-  return cachedUserId
+  const id = user.id || user._id
+  userIdCache.set(accessToken, id)
+  return id
 }
 
-// PROPFIND on /dav/calendars/<userId>/ to discover calendars (Depth: 1).
-// Returns array of {href, displayname}.
-const listCalendars = async (accessToken, userId) => {
-  if (cachedCalendarHrefs && cachedCalendarsFor === accessToken) return cachedCalendarHrefs
+// PROPFIND on /dav/calendars/<userId>/ to discover all calendars (own +
+// delegated). Sabre returns internal hrefs starting with /calendars/, we
+// prepend /dav so the proxy on tcalendar.linagora.com routes the follow-up
+// REPORT to Sabre.
+const fetchCalendars = async accessToken => {
+  if (calendarsCache.has(accessToken)) return calendarsCache.get(accessToken)
+  const userId = await getUserId(accessToken)
   const res = await fetch(`${CAL_BASE}/dav/calendars/${userId}/`, {
     method: 'PROPFIND',
     headers: {
@@ -48,10 +45,6 @@ const listCalendars = async (accessToken, userId) => {
     throw new Error(`PROPFIND calendars failed: ${res.status}`)
   }
   const xml = await res.text()
-  // Naive XML parsing — pull <d:href> + <d:displayname>. Sabre returns hrefs
-  // as /calendars/<userId>/<calId>/ (its own internal path) — we need to
-  // prepend /dav so the DAV proxy on tcalendar.linagora.com routes the
-  // request to Sabre.
   const calendars = []
   const responseRe = /<[^>]*?:?response[^>]*>([\s\S]*?)<\/[^>]*?:?response>/g
   let m
@@ -59,18 +52,28 @@ const listCalendars = async (accessToken, userId) => {
     const block = m[1]
     let href = (block.match(/<[^>]*?:?href[^>]*>([^<]+)</) || [])[1]
     const name = (block.match(/<[^>]*?:?displayname[^>]*>([^<]+)</) || [])[1]
-    // Only keep child calendars (not the root /calendars/<userId>/, not
-    // inbox/outbox which return 404 on displayname).
     if (!href || !href.match(new RegExp(`/calendars/${userId}/[^/]+/?$`))) continue
     if (/\/(inbox|outbox)\/?$/.test(href)) continue
     if (!name) continue
     if (!href.startsWith('/dav/')) href = '/dav' + href
-    if (!href.endsWith('/')) href = href + '/'
-    calendars.push({ href, displayname: name })
+    if (!href.endsWith('/')) href += '/'
+    // Calendar ID = last path segment before final /
+    const segments = href.replace(/\/$/, '').split('/')
+    const id = segments[segments.length - 1]
+    calendars.push({
+      id,
+      href,
+      displayname: name,
+      isOwn: id === userId
+    })
   }
-  cachedCalendarHrefs = calendars
-  cachedCalendarsFor = accessToken
+  calendarsCache.set(accessToken, calendars)
   return calendars
+}
+
+export const listCalendars = async () => {
+  const accessToken = await getValidAccessToken('calendar')
+  return fetchCalendars(accessToken)
 }
 
 const formatICalDate = d => {
@@ -86,9 +89,12 @@ const parseEventsFromCalendarMultiget = (xml, calendarName) => {
     const block = m[1]
     const cdata = (block.match(/<[^>]*?:?calendar-data[^>]*>([\s\S]*?)<\/[^>]*?:?calendar-data>/) || [])[1]
     if (!cdata) continue
-    let icalStr = cdata
-    // Unescape XML entities
-    icalStr = icalStr.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+    const icalStr = cdata
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&')
+      .replace(/&quot;/g, '"')
+      .replace(/&apos;/g, "'")
     try {
       const jcal = ICAL.parse(icalStr)
       const vcal = new ICAL.Component(jcal)
@@ -100,29 +106,24 @@ const parseEventsFromCalendarMultiget = (xml, calendarName) => {
           location: event.location || '',
           start: event.startDate ? event.startDate.toJSDate().toISOString() : null,
           end: event.endDate ? event.endDate.toJSDate().toISOString() : null,
-          allDay: event.startDate ? !event.startDate.isDate === false : false,
           calendarName
         })
       }
     } catch (e) {
-      // ignore malformed events
+      // ignore malformed ICS blobs
     }
   }
   return events
 }
 
 const queryEventsInRange = async (accessToken, calendarHref, startUTC, endUTC, calendarName) => {
-  const start = formatICalDate(startUTC)
-  const end = formatICalDate(endUTC)
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
 <c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
-  <d:prop>
-    <c:calendar-data/>
-  </d:prop>
+  <d:prop><c:calendar-data/></d:prop>
   <c:filter>
     <c:comp-filter name="VCALENDAR">
       <c:comp-filter name="VEVENT">
-        <c:time-range start="${start}" end="${end}"/>
+        <c:time-range start="${formatICalDate(startUTC)}" end="${formatICalDate(endUTC)}"/>
       </c:comp-filter>
     </c:comp-filter>
   </c:filter>
@@ -136,18 +137,25 @@ const queryEventsInRange = async (accessToken, calendarHref, startUTC, endUTC, c
     },
     body: xmlBody
   })
-  if (res.status === 404) return [] // empty calendar
-  if (!res.ok && res.status !== 207) {
-    throw new Error(`REPORT ${calendarHref} failed: ${res.status}`)
-  }
+  if (res.status === 404) return []
+  if (!res.ok && res.status !== 207) throw new Error(`REPORT ${calendarHref} failed: ${res.status}`)
   const xml = await res.text()
   return parseEventsFromCalendarMultiget(xml, calendarName)
 }
 
-export const eventsForDay = async dateISO => {
-  const accessToken = await getValidAccessToken()
-  const userId = await getUserId(accessToken)
-  const calendars = await listCalendars(accessToken, userId)
+// dateISO: 'YYYY-MM-DD'
+// calendarIds: array of calendar ids to include (default = user's own only)
+export const eventsForDay = async (dateISO, calendarIds) => {
+  const accessToken = await getValidAccessToken('calendar')
+  const allCalendars = await fetchCalendars(accessToken)
+  let calendars
+  if (Array.isArray(calendarIds) && calendarIds.length > 0) {
+    const set = new Set(calendarIds)
+    calendars = allCalendars.filter(c => set.has(c.id))
+  } else {
+    // Default: user's own calendar only
+    calendars = allCalendars.filter(c => c.isOwn)
+  }
   const day = new Date(dateISO)
   const startUTC = new Date(Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate(), 0, 0, 0))
   const endUTC = new Date(Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate() + 1, 0, 0, 0))
@@ -161,30 +169,21 @@ export const eventsForDay = async dateISO => {
       console.warn(`[caldav] cal ${cal.href} failed: ${e.message}`)
     }
   }))
-
-  // Dedupe by (uid + start). Same event appearing in multiple shared
-  // calendars (organizer + each attendee whose calendar we can see) and
-  // recurring events with multiple expansions all collapse into a single
-  // entry. Prefer the entry coming from the user's own primary calendar
-  // (named after the user) when picking which copy to keep.
-  const userCalName = calendars[0]?.displayname || ''
+  // Dedupe by uid+start, prefer the user's own calendar copy
+  const ownCalName = allCalendars.find(c => c.isOwn)?.displayname
   const byKey = new Map()
   for (const e of all) {
     const key = `${e.uid || e.summary}|${e.start || ''}`
     const prev = byKey.get(key)
     if (!prev) {
       byKey.set(key, e)
-    } else if (e.calendarName === userCalName && prev.calendarName !== userCalName) {
+    } else if (e.calendarName === ownCalName && prev.calendarName !== ownCalName) {
       byKey.set(key, e)
     }
   }
-  // Clip the day's range strictly (Sabre may include adjacent events).
   const startISO = startUTC.toISOString()
   const endISO = endUTC.toISOString()
-  const cleaned = [...byKey.values()].filter(e => {
-    if (!e.start) return false
-    return e.start >= startISO && e.start < endISO
-  })
+  const cleaned = [...byKey.values()].filter(e => e.start && e.start >= startISO && e.start < endISO)
   cleaned.sort((a, b) => a.start.localeCompare(b.start))
   return cleaned.slice(0, 50)
 }

@@ -1,7 +1,7 @@
 // Dashboard backend base URL (LINAGORA bridge: OIDC + JMAP + CalDAV).
-// Lives at https://dashboard-api.dev-twake.maudet.cloud, in front of athena's
-// systemd `dashboard-backend.service`.
 export const BACKEND_BASE = 'https://dashboard-api.dev-twake.maudet.cloud'
+
+export const WIDGET_IDS = { MAIL: 'mail', CALENDAR: 'calendar' }
 
 const randString = (len = 32) => {
   const arr = new Uint8Array(len)
@@ -16,11 +16,11 @@ const sha256base64url = async input => {
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
-// Build a PKCE OIDC authorize URL targeting LINAGORA SSO, with config pulled
-// from the backend (so the React app never sees client_id hardcoded).
-// Stores code_verifier + state in sessionStorage so the /oidc/callback view
-// can retrieve them.
-export const startLinagoraConnect = async () => {
+// Kick off PKCE OIDC for a specific widget. The widget id is stored in
+// sessionStorage alongside the PKCE values so the /oidc/callback view
+// can POST it back to the backend, which then routes the tokens to the
+// right slot.
+export const startLinagoraConnect = async widget => {
   const statusRes = await fetch(`${BACKEND_BASE}/api/status`, { credentials: 'include' })
   if (!statusRes.ok) throw new Error('backend /api/status unreachable')
   const status = await statusRes.json()
@@ -31,7 +31,9 @@ export const startLinagoraConnect = async () => {
   const state = randString(16)
   const nonce = randString(16)
 
-  sessionStorage.setItem('linagora_pkce', JSON.stringify({ code_verifier, state, nonce }))
+  sessionStorage.setItem('linagora_pkce', JSON.stringify({
+    code_verifier, state, nonce, widget
+  }))
 
   const params = new URLSearchParams({
     response_type: 'code',
@@ -46,15 +48,17 @@ export const startLinagoraConnect = async () => {
   window.location.href = `${cfg.issuer}/oauth2/authorize?${params}`
 }
 
-export const disconnectLinagora = async () => {
+export const disconnectLinagora = async widget => {
   await fetch(`${BACKEND_BASE}/api/disconnect`, {
     method: 'POST',
-    credentials: 'include'
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ widget })
   })
 }
 
-export const fetchConnectedStatus = async () => {
+export const fetchStatus = async () => {
   const res = await fetch(`${BACKEND_BASE}/api/status`, { credentials: 'include' })
-  if (!res.ok) return { connected: false }
+  if (!res.ok) return { widgets: { mail: { connected: false }, calendar: { connected: false } } }
   return res.json()
 }

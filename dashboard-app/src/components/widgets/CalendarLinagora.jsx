@@ -3,7 +3,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import Icon from 'cozy-ui/transpiled/react/Icon'
 import Spinner from 'cozy-ui/transpiled/react/Spinner'
 
-import { BACKEND_BASE, startLinagoraConnect } from 'src/utils/backend'
+import { BACKEND_BASE, startLinagoraConnect, WIDGET_IDS } from 'src/utils/backend'
 
 const ymd = d => {
   const pad = n => String(n).padStart(2, '0')
@@ -21,14 +21,20 @@ const formatTime = iso => {
   } catch (e) { return '' }
 }
 
-const CalendarLinagora = () => {
+const CalendarLinagora = ({ widgetConfig, reloadKey }) => {
   const [date, setDate] = useState(() => new Date())
   const [state, setState] = useState({ loading: true, error: null, events: null, notConnected: false })
+
+  const calendarIds = (widgetConfig && widgetConfig.selectedCalendarIds) || null
 
   const load = useCallback(async dt => {
     setState(s => ({ ...s, loading: true, error: null }))
     try {
-      const res = await fetch(`${BACKEND_BASE}/api/calendar/day?date=${ymd(dt)}`, { credentials: 'include' })
+      const params = new URLSearchParams({ date: ymd(dt) })
+      if (calendarIds && calendarIds.length > 0) {
+        params.set('calendarIds', calendarIds.join(','))
+      }
+      const res = await fetch(`${BACKEND_BASE}/api/calendar/day?${params}`, { credentials: 'include' })
       if (res.status === 401) {
         const body = await res.json().catch(() => ({}))
         if (body.error === 'NOT_CONNECTED') {
@@ -42,16 +48,15 @@ const CalendarLinagora = () => {
     } catch (e) {
       setState({ loading: false, error: e.message, events: null, notConnected: false })
     }
-  }, [])
+  }, [calendarIds])
 
-  useEffect(() => { load(date) }, [date, load])
+  useEffect(() => { load(date) }, [date, load, reloadKey])
 
   const shift = days => {
     const next = new Date(date)
     next.setDate(next.getDate() + days)
     setDate(next)
   }
-
   const isToday = ymd(date) === ymd(new Date())
 
   return (
@@ -71,7 +76,7 @@ const CalendarLinagora = () => {
       {state.notConnected ? (
         <div className="dashboard-empty">
           <p>Connectez votre compte LINAGORA pour voir votre agenda.</p>
-          <button className="create-btn" style={{ width: 'auto', marginTop: 8 }} onClick={() => startLinagoraConnect()}>
+          <button className="create-btn" style={{ width: 'auto', marginTop: 8 }} onClick={() => startLinagoraConnect(WIDGET_IDS.CALENDAR)}>
             Se connecter à LINAGORA
           </button>
         </div>

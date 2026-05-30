@@ -3,6 +3,7 @@ import RecentNotes from 'src/components/widgets/RecentNotes'
 import Tasks from 'src/components/widgets/Tasks'
 import MailLinagora from 'src/components/widgets/MailLinagora'
 import CalendarLinagora from 'src/components/widgets/CalendarLinagora'
+import ConfigureCalendarModal from 'src/components/ConfigureCalendarModal'
 
 // The widget catalogue. Each entry describes a widget that can be installed
 // on the dashboard. Order in this object drives the order in the "Gérer les
@@ -78,6 +79,7 @@ export const WIDGET_CATALOG = {
     accent: 'icon-calendar',
     category: 'external',
     Component: CalendarLinagora,
+    ConfigureModal: ConfigureCalendarModal,
     defaultLayout: { w: 6, h: 7, minW: 3, minH: 4 },
     needsConfig: true,
     enabledByDefault: false

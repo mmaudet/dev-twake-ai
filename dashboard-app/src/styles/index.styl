@@ -449,3 +449,93 @@ html, body, #app
 
 .widgetstore-switch input:checked + .widgetstore-switch-track::before
   transform translateX(20px)
+
+.widgetstore-card-configure
+  margin-top 6px
+  background transparent
+  border 1px solid rgba(41, 126, 242, 0.4)
+  color #297EF2
+  padding 4px 10px
+  border-radius 6px
+  font-size 12px
+  font-weight 600
+  font-family inherit
+  cursor pointer
+
+  &:hover
+    background rgba(41, 126, 242, 0.08)
+
+// ─── Widget header menu (⋯) ───────────────────────────────────────────────
+.widget-drag-handle
+  justify-content space-between
+
+.widget-menu-anchor
+  position relative
+  display flex
+  align-items center
+
+.widget-menu-btn
+  width 24px
+  height 24px
+  border-radius 50%
+  border none
+  background transparent
+  cursor pointer
+  display flex
+  align-items center
+  justify-content center
+  color #95999d
+  opacity 0
+  transition opacity 0.12s
+
+  &:hover
+    background rgba(0, 0, 0, 0.04)
+    color #1B1D2D
+
+.dashboard-widget-card:hover .widget-menu-btn
+  opacity 1
+
+.widget-menu-popover
+  position absolute
+  top calc(100% + 4px)
+  right 0
+  min-width 220px
+  z-index 10
+
+.create-menu-item.is-danger
+  color #e5415a
+
+  &:hover
+    background rgba(229, 65, 90, 0.08)
+
+// ─── Calendar config modal ────────────────────────────────────────────────
+.calendar-config-group
+  margin-bottom 12px
+
+.calendar-config-group-title
+  font-size 12px
+  font-weight 600
+  text-transform uppercase
+  letter-spacing 0.06em
+  color #6B7280
+  margin 12px 0 6px
+
+.calendar-config-row
+  display flex
+  align-items center
+  gap 10px
+  padding 4px 0
+  cursor pointer
+
+  input[type="checkbox"]
+    cursor pointer
+    width 16px
+    height 16px
+
+  span
+    font-size 14px
+    color #1B1D2D
+    flex 1
+    overflow hidden
+    text-overflow ellipsis
+    white-space nowrap

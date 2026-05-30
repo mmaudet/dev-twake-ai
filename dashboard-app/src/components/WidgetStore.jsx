@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import Icon from 'cozy-ui/transpiled/react/Icon'
@@ -8,7 +8,7 @@ import useDashboardLayout from 'src/hooks/useDashboardLayout'
 import Sidebar from 'src/components/Sidebar'
 import { listWidgets, CATEGORY_LABEL } from 'src/widgets/catalog'
 
-const WidgetCardRow = ({ widget, enabled, onToggle, disabled }) => (
+const WidgetCardRow = ({ widget, enabled, onToggle, disabled, onConfigure }) => (
   <div className={`widgetstore-card ${enabled ? 'is-enabled' : ''}`}>
     <span className={`dashboard-list-icon ${widget.accent}`} style={{ width: 40, height: 40 }}>
       <Icon icon={widget.icon} size={22} />
@@ -16,6 +16,14 @@ const WidgetCardRow = ({ widget, enabled, onToggle, disabled }) => (
     <div className="widgetstore-card-text">
       <div className="widgetstore-card-title">{widget.name}</div>
       <div className="widgetstore-card-desc">{widget.description}</div>
+      {widget.ConfigureModal && (
+        <button
+          className="widgetstore-card-configure"
+          onClick={() => onConfigure(widget.id)}
+        >
+          Configurer
+        </button>
+      )}
     </div>
     <label className="widgetstore-switch">
       <input
@@ -30,7 +38,8 @@ const WidgetCardRow = ({ widget, enabled, onToggle, disabled }) => (
 )
 
 const WidgetStore = () => {
-  const { config, widgets, loaded, setWidgetEnabled } = useDashboardLayout()
+  const { config, widgets, loaded, setWidgetEnabled, updateWidgetConfig } = useDashboardLayout()
+  const [configureFor, setConfigureFor] = useState(null)
 
   if (!loaded) {
     return (
@@ -49,6 +58,10 @@ const WidgetStore = () => {
     label: CATEGORY_LABEL[cat],
     items: all.filter(w => w.category === cat)
   })).filter(s => s.items.length > 0)
+
+  const findWidget = id => all.find(w => w.id === id)
+  const configuringCat = configureFor ? findWidget(configureFor) : null
+  const configuringState = configureFor ? widgets[configureFor] || { config: {} } : null
 
   return (
     <div className="dashboard-shell">
@@ -75,12 +88,22 @@ const WidgetStore = () => {
                     enabled={state.enabled && !disabled}
                     disabled={disabled}
                     onToggle={setWidgetEnabled}
+                    onConfigure={setConfigureFor}
                   />
                 )
               })}
             </div>
           </section>
         ))}
+
+        {configuringCat && configuringCat.ConfigureModal && (
+          <configuringCat.ConfigureModal
+            open
+            onClose={() => setConfigureFor(null)}
+            widgetConfig={configuringState.config}
+            onSave={patch => updateWidgetConfig(configureFor, patch)}
+          />
+        )}
       </main>
     </div>
   )

@@ -2,12 +2,13 @@ import express from 'express'
 
 import {
   exchangeCode,
-  getStoredTokens,
+  getStore,
   clearTokens,
-  loadOidcConfig
+  loadOidcConfig,
+  VALID_WIDGETS
 } from './tokens.js'
 import { listRecent } from './jmap.js'
-import { eventsForDay } from './caldav.js'
+import { eventsForDay, listCalendars } from './caldav.js'
 
 const app = express()
 const PORT = process.env.PORT || 8090
@@ -15,7 +16,6 @@ const DASHBOARD_ORIGIN = process.env.DASHBOARD_ORIGIN || 'https://mmaudet-dashbo
 
 app.use(express.json())
 
-// CORS — single dashboard origin, with credentials so cookies pass through
 app.use((req, res, next) => {
   res.set('Access-Control-Allow-Origin', DASHBOARD_ORIGIN)
   res.set('Vary', 'Origin')
@@ -26,13 +26,20 @@ app.use((req, res, next) => {
   next()
 })
 
+const statusFor = tokens => ({
+  connected: !!tokens?.access_token,
+  expires_at: tokens ? (tokens.saved_at || 0) + (tokens.expires_in || 0) : null
+})
+
 app.get('/api/status', async (req, res) => {
   try {
-    const tokens = await getStoredTokens()
+    const store = await getStore()
     const oidc = await loadOidcConfig()
     res.json({
-      connected: !!tokens?.access_token,
-      expires_at: tokens ? (tokens.saved_at || 0) + (tokens.expires_in || 0) : null,
+      widgets: {
+        mail: statusFor(store.mail),
+        calendar: statusFor(store.calendar)
+      },
       auth_url_template: {
         issuer: oidc.issuer,
         client_id: oidc.client_id,
@@ -45,30 +52,49 @@ app.get('/api/status', async (req, res) => {
   }
 })
 
-// POST { code, code_verifier } — invoked by the dashboard after OIDC redirect
 app.post('/oidc/callback', async (req, res) => {
   try {
-    const { code, code_verifier } = req.body || {}
+    const { code, code_verifier, widget } = req.body || {}
     if (!code || !code_verifier) {
       return res.status(400).json({ error: 'code and code_verifier required' })
     }
-    await exchangeCode({ code, code_verifier })
-    res.json({ ok: true })
+    if (!VALID_WIDGETS.has(widget)) {
+      return res.status(400).json({ error: `widget must be one of ${[...VALID_WIDGETS].join(', ')}` })
+    }
+    await exchangeCode(widget, { code, code_verifier })
+    res.json({ ok: true, widget })
   } catch (e) {
     res.status(500).json({ error: e.message })
   }
 })
 
 app.post('/api/disconnect', async (req, res) => {
-  await clearTokens()
-  res.json({ ok: true })
+  try {
+    const widget = req.body?.widget
+    if (!VALID_WIDGETS.has(widget)) {
+      return res.status(400).json({ error: 'widget required' })
+    }
+    await clearTokens(widget)
+    res.json({ ok: true, widget })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
 })
 
 app.get('/api/mail/recent', async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit, 10) || 10, 30)
-    const emails = await listRecent(limit)
-    res.json({ emails })
+    res.json({ emails: await listRecent(limit) })
+  } catch (e) {
+    if (e.code === 'NOT_CONNECTED') return res.status(401).json({ error: 'NOT_CONNECTED' })
+    res.status(500).json({ error: e.message })
+  }
+})
+
+app.get('/api/calendar/calendars', async (req, res) => {
+  try {
+    const cals = await listCalendars()
+    res.json({ calendars: cals.map(c => ({ id: c.id, displayname: c.displayname, isOwn: c.isOwn })) })
   } catch (e) {
     if (e.code === 'NOT_CONNECTED') return res.status(401).json({ error: 'NOT_CONNECTED' })
     res.status(500).json({ error: e.message })
@@ -78,7 +104,11 @@ app.get('/api/mail/recent', async (req, res) => {
 app.get('/api/calendar/day', async (req, res) => {
   try {
     const date = req.query.date || new Date().toISOString().slice(0, 10)
-    const events = await eventsForDay(date)
+    let calendarIds
+    if (req.query.calendarIds) {
+      calendarIds = String(req.query.calendarIds).split(',').filter(Boolean)
+    }
+    const events = await eventsForDay(date, calendarIds)
     res.json({ date, events })
   } catch (e) {
     if (e.code === 'NOT_CONNECTED') return res.status(401).json({ error: 'NOT_CONNECTED' })
@@ -86,9 +116,6 @@ app.get('/api/calendar/day', async (req, res) => {
   }
 })
 
-// Bind to all interfaces so the Tailscale-facing nginx on Hermes can reach
-// us at 100.64.110.85:PORT. There is no public interface on athena exposing
-// this port — only the Tailscale network — so this is safe.
 app.listen(PORT, '0.0.0.0', () => {
   // eslint-disable-next-line no-console
   console.log(`dashboard-backend listening on 0.0.0.0:${PORT}`)

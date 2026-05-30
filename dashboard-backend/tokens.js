@@ -3,6 +3,11 @@ import { promises as fs } from 'fs'
 const TOKENS_PATH = process.env.TOKENS_PATH || '/home/mmaudet/.dashboard-backend/tokens.json'
 const OIDC_CONFIG_PATH = process.env.OIDC_CONFIG_PATH || '/home/mmaudet/.dashboard-backend/oidc.json'
 
+// Widget id constants — these are the keys under which we store tokens
+// in the JSON file. Each widget keeps its own independent connection,
+// even though both go through sso.linagora.com with the same client.
+export const VALID_WIDGETS = new Set(['mail', 'calendar'])
+
 let cache = null
 
 export const loadOidcConfig = async () => {
@@ -13,42 +18,76 @@ export const loadOidcConfig = async () => {
 const readTokens = async () => {
   try {
     const raw = await fs.readFile(TOKENS_PATH, 'utf8')
-    cache = JSON.parse(raw)
+    const parsed = JSON.parse(raw)
+    // Migration: legacy single-account file → put under widget 'mail'
+    if (parsed.access_token && !parsed.mail && !parsed.calendar) {
+      cache = { mail: parsed, calendar: null }
+    } else {
+      cache = {
+        mail: parsed.mail || null,
+        calendar: parsed.calendar || null
+      }
+    }
     return cache
   } catch (e) {
-    if (e.code === 'ENOENT') return null
+    if (e.code === 'ENOENT') {
+      cache = { mail: null, calendar: null }
+      return cache
+    }
     throw e
   }
 }
 
-const writeTokens = async tokens => {
-  const enriched = {
-    ...tokens,
-    saved_at: Math.floor(Date.now() / 1000)
-  }
-  await fs.writeFile(TOKENS_PATH, JSON.stringify(enriched, null, 2), { mode: 0o600 })
-  cache = enriched
-  return enriched
+const writeTokens = async store => {
+  await fs.writeFile(TOKENS_PATH, JSON.stringify(store, null, 2), { mode: 0o600 })
+  cache = store
+  return store
 }
 
-export const getStoredTokens = async () => {
+export const getStore = async () => {
   if (cache) return cache
   return readTokens()
 }
 
-export const saveTokens = writeTokens
+const assertWidget = widget => {
+  if (!VALID_WIDGETS.has(widget)) {
+    throw Object.assign(new Error(`Invalid widget '${widget}'`), { status: 400 })
+  }
+}
+
+export const getTokens = async widget => {
+  assertWidget(widget)
+  const store = await getStore()
+  return store[widget]
+}
+
+export const saveTokens = async (widget, tokens) => {
+  assertWidget(widget)
+  const store = await getStore()
+  store[widget] = {
+    ...tokens,
+    saved_at: Math.floor(Date.now() / 1000)
+  }
+  await writeTokens(store)
+  return store[widget]
+}
+
+export const clearTokens = async widget => {
+  assertWidget(widget)
+  const store = await getStore()
+  store[widget] = null
+  await writeTokens(store)
+}
 
 export const isExpired = (tokens, marginSeconds = 60) => {
   if (!tokens || !tokens.access_token) return true
   const savedAt = tokens.saved_at || 0
   const expiresIn = tokens.expires_in || 0
-  const expiresAt = savedAt + expiresIn
-  return Date.now() / 1000 >= expiresAt - marginSeconds
+  return Date.now() / 1000 >= savedAt + expiresIn - marginSeconds
 }
 
-// Exchange an auth code (with PKCE verifier) for tokens. Pure PKCE flow,
-// no client_secret needed — confirmed empirically with mmaudet-dashboard.
-export const exchangeCode = async ({ code, code_verifier, redirect_uri }) => {
+export const exchangeCode = async (widget, { code, code_verifier, redirect_uri }) => {
+  assertWidget(widget)
   const cfg = await loadOidcConfig()
   const body = new URLSearchParams({
     grant_type: 'authorization_code',
@@ -66,16 +105,17 @@ export const exchangeCode = async ({ code, code_verifier, redirect_uri }) => {
     body
   })
   if (!res.ok) {
-    const errBody = await res.text()
-    throw new Error(`OIDC token exchange failed: ${res.status} ${errBody}`)
+    throw new Error(`OIDC token exchange failed: ${res.status} ${await res.text()}`)
   }
-  return saveTokens(await res.json())
+  return saveTokens(widget, await res.json())
 }
 
-const refreshTokens = async tokens => {
+const refreshTokens = async (widget, tokens) => {
   const cfg = await loadOidcConfig()
   if (!tokens?.refresh_token) {
-    throw new Error('No refresh_token stored — user must re-authenticate')
+    const err = new Error('NOT_CONNECTED')
+    err.code = 'NOT_CONNECTED'
+    throw err
   }
   const body = new URLSearchParams({
     grant_type: 'refresh_token',
@@ -91,35 +131,24 @@ const refreshTokens = async tokens => {
     body
   })
   if (!res.ok) {
-    const errBody = await res.text()
-    throw new Error(`Refresh failed: ${res.status} ${errBody}`)
+    throw new Error(`Refresh failed: ${res.status} ${await res.text()}`)
   }
   const fresh = await res.json()
-  // refresh_token may or may not be rotated by Lemonldap — keep old as fallback
-  return saveTokens({
-    refresh_token: tokens.refresh_token,
+  return saveTokens(widget, {
+    refresh_token: tokens.refresh_token, // Lemonldap may not rotate
     ...fresh
   })
 }
 
-export const getValidAccessToken = async () => {
-  let tokens = await getStoredTokens()
+export const getValidAccessToken = async widget => {
+  let tokens = await getTokens(widget)
   if (!tokens) {
     const err = new Error('NOT_CONNECTED')
     err.code = 'NOT_CONNECTED'
     throw err
   }
   if (isExpired(tokens)) {
-    tokens = await refreshTokens(tokens)
+    tokens = await refreshTokens(widget, tokens)
   }
   return tokens.access_token
-}
-
-export const clearTokens = async () => {
-  try {
-    await fs.unlink(TOKENS_PATH)
-  } catch (e) {
-    if (e.code !== 'ENOENT') throw e
-  }
-  cache = null
 }

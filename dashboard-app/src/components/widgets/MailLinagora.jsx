@@ -3,7 +3,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import Icon from 'cozy-ui/transpiled/react/Icon'
 import Spinner from 'cozy-ui/transpiled/react/Spinner'
 
-import { BACKEND_BASE, startLinagoraConnect } from 'src/utils/backend'
+import { BACKEND_BASE, startLinagoraConnect, WIDGET_IDS } from 'src/utils/backend'
 
 const formatDate = ts => {
   if (!ts) return ''
@@ -14,7 +14,7 @@ const formatDate = ts => {
   } catch (e) { return '' }
 }
 
-const MailLinagora = () => {
+const MailLinagora = ({ reloadKey }) => {
   const [state, setState] = useState({ loading: true, error: null, emails: null, notConnected: false })
 
   const load = useCallback(async () => {
@@ -36,13 +36,14 @@ const MailLinagora = () => {
     }
   }, [])
 
-  useEffect(() => { load() }, [load])
+  // reloadKey changes (e.g. after a disconnect from the widget menu) → refetch
+  useEffect(() => { load() }, [load, reloadKey])
 
   if (state.notConnected) {
     return (
       <div className="dashboard-empty">
         <p>Connectez votre compte LINAGORA pour voir vos derniers mails.</p>
-        <button className="create-btn" style={{ width: 'auto', marginTop: 8 }} onClick={() => startLinagoraConnect()}>
+        <button className="create-btn" style={{ width: 'auto', marginTop: 8 }} onClick={() => startLinagoraConnect(WIDGET_IDS.MAIL)}>
           Se connecter à LINAGORA
         </button>
       </div>

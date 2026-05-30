@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Responsive, WidthProvider } from 'react-grid-layout'
 
 import 'react-grid-layout/css/styles.css'
@@ -12,14 +12,21 @@ import Sidebar from 'src/components/Sidebar'
 import ActionsMenu from 'src/components/ActionsMenu'
 import WidgetCard from 'src/components/WidgetCard'
 import { WIDGET_CATALOG } from 'src/widgets/catalog'
+import { disconnectLinagora } from 'src/utils/backend'
 
 const ResponsiveGridLayout = WidthProvider(Responsive)
+
+// Widgets bound to the LINAGORA SSO — adding one here exposes the
+// "Se déconnecter" action in its ⋯ menu.
+const LINAGORA_WIDGETS = new Set(['mail', 'calendar'])
 
 const Dashboard = () => {
   const {
     layouts, config, widgets, loaded,
-    updateLayouts, updateConfig, updateWidgetConfig, DEFAULT_LAYOUT
+    updateLayouts, updateConfig, updateWidgetConfig, setWidgetEnabled, DEFAULT_LAYOUT
   } = useDashboardLayout()
+  const [configureFor, setConfigureFor] = useState(null) // widget id with ConfigureModal open
+  const [reloadKey, setReloadKey] = useState(0)
 
   const onResetLayout = () => {
     updateLayouts(DEFAULT_LAYOUT)
@@ -37,10 +44,32 @@ const Dashboard = () => {
     )
   }
 
-  // Only render widgets whose catalogue entry has a Component AND that the
-  // user hasn't disabled. Items in the layout that don't match are filtered
-  // out (catalogue entries removed in a future release, "coming soon"
-  // widgets, etc.).
+  const buildMenuActions = (cat, widgetState) => {
+    const actions = []
+    if (cat.ConfigureModal) {
+      actions.push({ label: 'Configurer', onClick: () => setConfigureFor(cat.id) })
+    }
+    if (LINAGORA_WIDGETS.has(cat.id)) {
+      actions.push({
+        label: `Se déconnecter de LINAGORA`,
+        onClick: async () => {
+          await disconnectLinagora(cat.id)
+          setReloadKey(k => k + 1)
+          Alerter.success('Déconnecté de LINAGORA')
+        }
+      })
+    }
+    actions.push({
+      label: 'Retirer le widget',
+      danger: true,
+      onClick: () => {
+        setWidgetEnabled(cat.id, false)
+        Alerter.info(`Widget "${cat.name}" retiré`)
+      }
+    })
+    return actions
+  }
+
   const items = (layouts.lg || [])
     .filter(item => {
       const cat = WIDGET_CATALOG[item.i]
@@ -54,17 +83,21 @@ const Dashboard = () => {
       const widgetState = widgets[item.i] || { config: {} }
       return (
         <div key={item.i} className="dashboard-widget-cell">
-          <WidgetCard title={cat.name}>
+          <WidgetCard title={cat.name} menuActions={buildMenuActions(cat, widgetState)}>
             <Component
               config={config}
               updateConfig={updateConfig}
               widgetConfig={widgetState.config}
               updateWidgetConfig={patch => updateWidgetConfig(item.i, patch)}
+              reloadKey={reloadKey}
             />
           </WidgetCard>
         </div>
       )
     })
+
+  const configuringCat = configureFor ? WIDGET_CATALOG[configureFor] : null
+  const configuringState = configureFor ? widgets[configureFor] || { config: {} } : null
 
   return (
     <div className="dashboard-shell">
@@ -90,6 +123,15 @@ const Dashboard = () => {
         >
           {items}
         </ResponsiveGridLayout>
+
+        {configuringCat && configuringCat.ConfigureModal && (
+          <configuringCat.ConfigureModal
+            open
+            onClose={() => setConfigureFor(null)}
+            widgetConfig={configuringState.config}
+            onSave={patch => updateWidgetConfig(configureFor, patch)}
+          />
+        )}
       </main>
     </div>
   )
