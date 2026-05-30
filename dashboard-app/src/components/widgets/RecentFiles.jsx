@@ -89,7 +89,7 @@ const RecentFiles = () => {
   const cozyUrl = client.getStackClient().uri
 
   if (result.fetchStatus === 'loading' || !result.data) {
-    return <div className="u-flex u-flex-justify-center u-mt-1"><Spinner size="large" /></div>
+    return <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 16 }}><Spinner size="large" /></div>
   }
   const isNote = f =>
     f.mime === 'text/vnd.cozy.note+markdown' ||
@@ -98,27 +98,28 @@ const RecentFiles = () => {
   const files = (result.data || [])
     .filter(f => f.type === 'file' && !isNote(f))
     .slice(0, 8)
-  if (files.length === 0) return <div className="u-c-grey">Aucun fichier récent.</div>
+  if (files.length === 0) return <div className="dashboard-empty">Aucun fichier récent.</div>
 
   return (
     <ul className="dashboard-list">
-      {files.map(file => (
-        <li
-          key={file._id}
-          className="dashboard-list-item"
-          onClick={() => openFile(client, cozyUrl, file)}
-        >
-          <Icon
-            icon={file.class === 'shortcut' ? 'link' : 'file-type-cloud'}
-            size={20}
-            className="dashboard-list-icon"
-          />
-          <div className="dashboard-list-text">
-            <div className="dashboard-list-primary">{file.name}</div>
-            <div className="dashboard-list-secondary">{formatDate(file.updated_at || file.created_at)}</div>
-          </div>
-        </li>
-      ))}
+      {files.map(file => {
+        const isShortcut = file.class === 'shortcut'
+        return (
+          <li
+            key={file._id}
+            className="dashboard-list-item"
+            onClick={() => openFile(client, cozyUrl, file)}
+          >
+            <span className={`dashboard-list-icon ${isShortcut ? 'icon-shortcut' : 'icon-file'}`}>
+              <Icon icon={isShortcut ? 'link' : 'file-type-cloud'} size={18} />
+            </span>
+            <div className="dashboard-list-text">
+              <div className="dashboard-list-primary">{file.name}</div>
+              <div className="dashboard-list-secondary">{formatDate(file.updated_at || file.created_at)}</div>
+            </div>
+          </li>
+        )
+      })}
     </ul>
   )
 }

@@ -1,10 +1,13 @@
-import React, { useRef, useState } from 'react'
-import { useClient, Q } from 'cozy-client'
+import React, { useEffect, useRef, useState } from 'react'
+import { Q, useClient } from 'cozy-client'
 
+import Icon from 'cozy-ui/transpiled/react/Icon'
+import Alerter from 'cozy-ui/transpiled/react/Alerter'
+import Dialog, { DialogTitle, DialogContent, DialogActions } from 'cozy-ui/transpiled/react/Dialog'
 import Button from 'cozy-ui/transpiled/react/Button'
 import TextField from 'cozy-ui/transpiled/react/MuiCozyTheme/TextField'
-import Dialog, { DialogTitle, DialogContent, DialogActions } from 'cozy-ui/transpiled/react/Dialog'
-import Alerter from 'cozy-ui/transpiled/react/Alerter'
+
+import StorageBlock from 'src/components/StorageBlock'
 
 const buildAppUrl = (cozyUrl, slug, path = '/') => {
   const u = new URL(cozyUrl)
@@ -12,18 +15,53 @@ const buildAppUrl = (cozyUrl, slug, path = '/') => {
   return `${u.protocol}//${host}${path}`
 }
 
-const QuickCapture = ({ config }) => {
+const refetchWidgets = client => {
+  const refresh = Q('io.cozy.files')
+    .where({ trashed: false })
+    .indexFields(['updated_at'])
+    .sortBy([{ updated_at: 'desc' }])
+    .limitBy(40)
+  try { client.query(refresh, { as: 'recentFiles' }) } catch (_) {}
+  try { client.query(refresh, { as: 'recentNotes' }) } catch (_) {}
+}
+
+const noteSchema = {
+  nodes: [
+    ['doc', { content: 'block+' }],
+    ['paragraph', { content: 'inline*', group: 'block' }],
+    ['text', { group: 'inline' }]
+  ]
+}
+
+const Sidebar = ({ config }) => {
   const client = useClient()
+  const cozyUrl = client.getStackClient().uri
   const fileInputRef = useRef(null)
-  const [showTaskDialog, setShowTaskDialog] = useState(false)
+  const menuRef = useRef(null)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [taskDialog, setTaskDialog] = useState(false)
   const [taskTitle, setTaskTitle] = useState('')
   const [taskListId, setTaskListId] = useState(config.defaultKanbnListId || '')
   const [busy, setBusy] = useState(false)
 
-  const cozyUrl = client.getStackClient().uri
+  useEffect(() => {
+    if (!menuOpen) return undefined
+    const onDown = e => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false)
+    }
+    const onKey = e => { if (e.key === 'Escape') setMenuOpen(false) }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [menuOpen])
 
-  // ----- New note -----
+  useEffect(() => { setTaskListId(config.defaultKanbnListId || '') }, [config.defaultKanbnListId])
+
   const onNewNote = async () => {
+    setMenuOpen(false)
     setBusy(true)
     try {
       const rootDir = await client.stackClient.fetchJSON('GET', '/files/io.cozy.files.root-dir')
@@ -31,27 +69,12 @@ const QuickCapture = ({ config }) => {
       const res = await client.stackClient.fetchJSON('POST', '/notes', {
         data: {
           type: 'io.cozy.notes.documents',
-          attributes: {
-            title: '',
-            dir_id: dirId,
-            schema: {
-              nodes: [
-                ['doc', { content: 'block+' }],
-                ['paragraph', { content: 'inline*', group: 'block' }],
-                ['text', { group: 'inline' }]
-              ]
-            }
-          }
+          attributes: { title: '', dir_id: dirId, schema: noteSchema }
         }
       })
       const noteId = res.data && res.data.id
-      if (noteId) {
-        // Force cozy-client to refetch so RecentNotes shows the new note
-        // when the user comes back to the dashboard.
-        try { await client.query(Q('io.cozy.files').where({trashed:false}).indexFields(['updated_at']).sortBy([{updated_at:'desc'}]).limitBy(40), { as: 'recentNotes' }) } catch (_) {}
-        try { await client.query(Q('io.cozy.files').where({trashed:false}).indexFields(['updated_at']).sortBy([{updated_at:'desc'}]).limitBy(40), { as: 'recentFiles' }) } catch (_) {}
-        window.open(buildAppUrl(cozyUrl, 'notes', `/#/n/${noteId}`), '_blank')
-      }
+      refetchWidgets(client)
+      if (noteId) window.open(buildAppUrl(cozyUrl, 'notes', `/#/n/${noteId}`), '_blank')
     } catch (e) {
       // eslint-disable-next-line no-console
       console.error(e)
@@ -61,8 +84,8 @@ const QuickCapture = ({ config }) => {
     }
   }
 
-  // ----- Upload file -----
   const onUploadClick = () => {
+    setMenuOpen(false)
     if (fileInputRef.current) fileInputRef.current.click()
   }
   const onFileChange = async e => {
@@ -74,6 +97,7 @@ const QuickCapture = ({ config }) => {
       await client.stackClient.fetchJSON('POST', url, file, {
         headers: { 'Content-Type': file.type || 'application/octet-stream' }
       })
+      refetchWidgets(client)
       Alerter.success(`Fichier "${file.name}" uploadé`)
     } catch (err) {
       // eslint-disable-next-line no-console
@@ -85,7 +109,10 @@ const QuickCapture = ({ config }) => {
     }
   }
 
-  // ----- New kan.bn task -----
+  const onOpenTaskDialog = () => {
+    setMenuOpen(false)
+    setTaskDialog(true)
+  }
   const onNewTask = async () => {
     if (!taskTitle.trim()) return
     if (!config.kanbnApiKey || !taskListId.trim()) {
@@ -112,7 +139,7 @@ const QuickCapture = ({ config }) => {
       if (!res.ok) throw new Error(`kan.bn POST /cards ${res.status}`)
       Alerter.success('Tâche créée')
       setTaskTitle('')
-      setShowTaskDialog(false)
+      setTaskDialog(false)
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error(err)
@@ -123,14 +150,37 @@ const QuickCapture = ({ config }) => {
   }
 
   return (
-    <div className="u-flex u-flex-column" style={{ gap: 8 }}>
-      <Button label="Nouvelle note" icon="plus" onClick={onNewNote} busy={busy} />
-      <Button label="Uploader un fichier" icon="upload" onClick={onUploadClick} busy={busy} />
-      <input ref={fileInputRef} type="file" hidden onChange={onFileChange} />
-      <Button label="Nouvelle tâche kan.bn" icon="checklist" onClick={() => setShowTaskDialog(true)} busy={busy} />
+    <aside className="dashboard-sidebar">
+      <div ref={menuRef} style={{ position: 'relative' }}>
+        <button className="create-btn" onClick={() => setMenuOpen(o => !o)} disabled={busy}>
+          <span className="create-btn-icon">+</span>
+          Créer
+        </button>
+        {menuOpen && (
+          <div className="create-menu">
+            <button className="create-menu-item" onClick={onNewNote} disabled={busy}>
+              <span className="create-menu-item-icon"><Icon icon="file-type-text" size={20} color="#f5a623" /></span>
+              Nouvelle note
+            </button>
+            <button className="create-menu-item" onClick={onUploadClick} disabled={busy}>
+              <span className="create-menu-item-icon"><Icon icon="upload" size={20} color="#297EF2" /></span>
+              Uploader un fichier
+            </button>
+            <button className="create-menu-item" onClick={onOpenTaskDialog} disabled={busy}>
+              <span className="create-menu-item-icon"><Icon icon="check-square" size={20} color="#f5a623" /></span>
+              Nouvelle tâche kan.bn
+            </button>
+          </div>
+        )}
+        <input ref={fileInputRef} type="file" hidden onChange={onFileChange} />
+      </div>
 
-      {showTaskDialog && (
-        <Dialog open onClose={() => setShowTaskDialog(false)}>
+      <div className="dashboard-sidebar-spacer" />
+
+      <StorageBlock />
+
+      {taskDialog && (
+        <Dialog open onClose={() => setTaskDialog(false)}>
           <DialogTitle>Nouvelle tâche kan.bn</DialogTitle>
           <DialogContent>
             <TextField
@@ -145,18 +195,18 @@ const QuickCapture = ({ config }) => {
               value={taskListId}
               onChange={e => setTaskListId(e.target.value)}
               fullWidth
-              helperText="Récupérable via l'API kan.bn ou les paramètres dashboard"
+              helperText="Pré-rempli depuis les paramètres si défini"
               style={{ marginTop: 12 }}
             />
           </DialogContent>
           <DialogActions>
-            <Button theme="secondary" label="Annuler" onClick={() => setShowTaskDialog(false)} />
+            <Button theme="secondary" label="Annuler" onClick={() => setTaskDialog(false)} />
             <Button label="Créer" onClick={onNewTask} busy={busy} />
           </DialogActions>
         </Dialog>
       )}
-    </div>
+    </aside>
   )
 }
 
-export default QuickCapture
+export default Sidebar

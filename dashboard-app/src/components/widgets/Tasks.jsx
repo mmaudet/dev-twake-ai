@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import Spinner from 'cozy-ui/transpiled/react/Spinner'
+import Icon from 'cozy-ui/transpiled/react/Icon'
 
 const KANBN_BASE = 'https://kanbn.dev-twake.maudet.cloud/api/v1'
 
@@ -88,20 +89,20 @@ const Tasks = ({ config }) => {
 
   if (!config.kanbnApiKey) {
     return (
-      <div className="u-c-grey">
+      <div className="dashboard-empty">
         Configurez votre API key kan.bn dans les{' '}
         <Link to="/settings">paramètres</Link> pour voir vos tâches.
       </div>
     )
   }
   if (error) {
-    return <div className="u-c-error">Erreur : {error}</div>
+    return <div className="dashboard-error">Erreur : {error}</div>
   }
   if (tasks === null) {
-    return <div className="u-flex u-flex-justify-center u-mt-1"><Spinner size="large" /></div>
+    return <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 16 }}><Spinner size="large" /></div>
   }
   if (tasks.length === 0) {
-    return <div className="u-c-grey">Aucune tâche assignée.</div>
+    return <div className="dashboard-empty">Aucune tâche assignée.</div>
   }
 
   return (
@@ -112,6 +113,9 @@ const Tasks = ({ config }) => {
           className="dashboard-list-item"
           onClick={() => window.open(t.url, '_blank')}
         >
+          <span className="dashboard-list-icon icon-task">
+            <Icon icon="check-square" size={18} />
+          </span>
           <div className="dashboard-list-text">
             <div className="dashboard-list-primary">{t.title}</div>
             <div className="dashboard-list-secondary">

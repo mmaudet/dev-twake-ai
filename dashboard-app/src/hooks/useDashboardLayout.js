@@ -2,12 +2,12 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { useClient } from 'cozy-client'
 
 const SETTING_ID = 'dashboard'
+// 3 widgets after the redesign — Quick capture lives in the sidebar now.
 const DEFAULT_LAYOUT = {
   lg: [
-    { i: 'recentFiles',  x: 0, y: 0, w: 6, h: 6, minW: 3, minH: 4 },
-    { i: 'recentNotes',  x: 6, y: 0, w: 6, h: 6, minW: 3, minH: 4 },
-    { i: 'tasks',        x: 0, y: 6, w: 8, h: 6, minW: 4, minH: 4 },
-    { i: 'quickCapture', x: 8, y: 6, w: 4, h: 6, minW: 3, minH: 4 }
+    { i: 'recentFiles', x: 0, y: 0, w: 6, h: 6, minW: 3, minH: 4 },
+    { i: 'recentNotes', x: 6, y: 0, w: 6, h: 6, minW: 3, minH: 4 },
+    { i: 'tasks',       x: 0, y: 6, w: 12, h: 7, minW: 4, minH: 4 }
   ]
 }
 
