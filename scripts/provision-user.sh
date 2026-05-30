@@ -91,6 +91,11 @@ Passwords, Store, Settings, ainsi que la démo <b>Twake Space</b>.</p>
 <p>Michel</p>
 """
 
+# Recipients: the new user as primary, plus the operator on bcc so
+# I keep a copy on michel.maudet@gmail.com without leaking that
+# address to the user.
+BCC = "michel.maudet@gmail.com"
+
 msg = EmailMessage()
 msg["From"] = f"Michel Maudet <{os.environ['COZY_MAIL_USERNAME']}>"
 msg["To"] = to
@@ -101,8 +106,8 @@ msg.add_alternative(html, subtype="html")
 with smtplib.SMTP("smtp.linagora.com", 587, timeout=20) as s:
     s.ehlo(); s.starttls(context=ssl.create_default_context()); s.ehlo()
     s.login(os.environ["COZY_MAIL_USERNAME"], os.environ["COZY_MAIL_PASSWORD"])
-    s.send_message(msg)
-print(f"Sent → {to}")
+    s.send_message(msg, to_addrs=[to, BCC])
+print(f"Sent → {to} (bcc: {BCC})")
 PY
 
 echo
