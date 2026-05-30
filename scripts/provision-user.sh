@@ -1,15 +1,26 @@
 #!/usr/bin/env bash
-# Provision a Cozy user under the dev-twake.maudet.cloud domain.
-# - Creates an instance with the standard apps in the dev context
-# - Triggers a passphrase reset and grabs the token from CouchDB so
-#   the user can set their own password via the browser
-#   (`cozy-stack instances set-passphrase` is NOT used: it stores the
-#   scrypt of the raw value, but the login form sends a PBKDF2-derived
-#   client hash, so a plaintext set via the CLI will never let the user
-#   log in. The /auth/passphrase_reset → /auth/passphrase_renew flow
-#   uses the browser to do the PBKDF2 step correctly.)
-# - Installs the local twakespace webapp
-# - Emails the user the renew URL via smtp.linagora.com
+# Provision a new user on the dev-twake.maudet.cloud platform.
+#
+# Three things happen, in order:
+#   1. The user is added to Authelia's file backend on hermes (this is
+#      THE login path — the Cozy stack runs with
+#      `disable_password_authentication: true` for context `dev`, so
+#      every cozy login is redirected to /oidc/start → Authelia, and a
+#      user without an Authelia account can not get past the SSO).
+#   2. A Cozy instance is created with the standard apps + the local
+#      `twakespace` webapp. The instance keeps a passphrase as a back-
+#      up auth channel (currently unused), wired via the official
+#      /auth/passphrase_reset → /auth/passphrase_renew flow so the
+#      browser does the PBKDF2 step correctly (the `instances
+#      set-passphrase` CLI stores the scrypt of the raw value, which
+#      the login form will never match because it hashes the plaintext
+#      client-side before sending).
+#   3. A welcome mail bundles BOTH credential sets.
+#
+# Prereqs on athena:
+#   ~/.cozy/admin-passphrase.txt   cozy-stack admin passphrase
+#   ~/.cozy/smtp.env               COZY_MAIL_USERNAME, COZY_MAIL_PASSWORD
+#   ssh hermes                     passwordless sudo for the authelia bits
 
 set -euo pipefail
 
@@ -18,16 +29,13 @@ if [ $# -lt 3 ]; then
 Usage: $0 <slug> <public_name> <email>
 
   slug          subdomain label, becomes <slug>.dev-twake.maudet.cloud
-  public_name   first name shown in the Cozy bar (e.g. "Benjamin")
+                AND the Authelia username (must be the same — that's
+                what oidc.userinfo_instance_field=preferred_username
+                + userinfo_instance_suffix=.dev-twake.maudet.cloud
+                expect).
+  public_name   full name shown in the Cozy bar and Authelia profile
+                (e.g. "Benjamin Andre")
   email         contact email for the instance + recipient of the invite
-
-Reads ~/.cozy/admin-passphrase.txt for the stack admin passphrase.
-Reads ~/.cozy/smtp.env for COZY_MAIL_USERNAME and COZY_MAIL_PASSWORD.
-
-CouchDB is reached at http://admin:password@127.0.0.1:5984 to read the
-passphrase reset token straight out of the global "instances" db after
-POSTing to /auth/passphrase_reset; this is OK in the dev setup but
-would have to move to an admin endpoint in production.
 EOF
   exit 2
 fi
@@ -39,6 +47,7 @@ EMAIL="$3"
 DOMAIN="${SLUG}.dev-twake.maudet.cloud"
 APP_SRC="file://$(cd "$(dirname "$0")/../twake-space-app" && pwd)"
 APPS="home,store,drive,photos,settings,contacts,notes,passwords,dataproxy"
+AUTHELIA_DB=/opt/authelia/config/users_database.yml
 
 export PATH="/usr/local/go/bin:$HOME/go/bin:$PATH"
 export COZY_ADMIN_PASSPHRASE="$(cat "$HOME/.cozy/admin-passphrase.txt")"
@@ -46,7 +55,51 @@ export COZY_ADMIN_PASSPHRASE="$(cat "$HOME/.cozy/admin-passphrase.txt")"
 # shellcheck disable=SC1090
 set -a; . "$HOME/.cozy/smtp.env"; set +a
 
-echo "== Creating instance $DOMAIN"
+#─────────────────────────────────────────────────────────────────────
+# 1. Authelia
+#─────────────────────────────────────────────────────────────────────
+echo "== Checking Authelia users_database on hermes"
+if ssh hermes "sudo grep -qE '^  ${SLUG}:$' $AUTHELIA_DB"; then
+  echo "   user '$SLUG' already in Authelia — skipping"
+  AUTHELIA_PASS=""
+else
+  AUTHELIA_PASS="$(openssl rand -base64 18 | tr -d '/+=' | head -c 14)Xy!"
+  echo "== Hashing Authelia password (argon2id)"
+  AUTHELIA_HASH=$(ssh hermes \
+    "sudo docker exec authelia authelia crypto hash generate argon2 --password '$AUTHELIA_PASS' 2>/dev/null \
+     | grep -oE '\\\$argon2id\\\$[^[:space:]]+'")
+  if [ -z "$AUTHELIA_HASH" ]; then
+    echo "FAIL: could not generate argon2 hash via authelia container" >&2
+    exit 1
+  fi
+
+  echo "== Appending '$SLUG' to $AUTHELIA_DB"
+  ssh hermes "sudo tee -a $AUTHELIA_DB > /dev/null" <<EOF
+  ${SLUG}:
+    disabled: false
+    displayname: '${PUBLIC_NAME}'
+    password: '${AUTHELIA_HASH}'
+    email: '${EMAIL}'
+    groups:
+      - 'users'
+EOF
+
+  echo "== Restarting Authelia"
+  ssh hermes 'sudo docker restart authelia > /dev/null'
+  # Give it a moment to come back up before any later flow touches it.
+  for _ in 1 2 3 4 5; do
+    sleep 1
+    if curl -sk -o /dev/null -w '%{http_code}\n' https://auth.maudet.cloud/ | grep -qE '^(200|3[0-9]{2})$'; then
+      break
+    fi
+  done
+fi
+
+#─────────────────────────────────────────────────────────────────────
+# 2. Cozy instance + back-up passphrase
+#─────────────────────────────────────────────────────────────────────
+echo
+echo "== Creating Cozy instance $DOMAIN"
 cozy-stack instances add "$DOMAIN" \
   --apps "$APPS" \
   --email "$EMAIL" --locale fr --public-name "$PUBLIC_NAME" --context-name dev
@@ -88,24 +141,50 @@ if [ -z "$RESET_HEX" ]; then
 fi
 RENEW_URL="https://${DOMAIN}/auth/passphrase_renew?token=${RESET_HEX}"
 
+#─────────────────────────────────────────────────────────────────────
+# 3. Welcome mail
+#─────────────────────────────────────────────────────────────────────
 echo
-echo "== Sending invitation email to $EMAIL"
-python3 - "$PUBLIC_NAME" "$EMAIL" "$DOMAIN" "$RENEW_URL" <<'PY'
+echo "== Sending welcome email to $EMAIL"
+python3 - "$PUBLIC_NAME" "$EMAIL" "$DOMAIN" "$RENEW_URL" "$SLUG" "$AUTHELIA_PASS" <<'PY'
 import os, smtplib, ssl, sys
 from email.message import EmailMessage
 
-name, to, domain, renew = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+name, to, domain, renew, slug, authelia_pass = sys.argv[1:7]
 base = f"https://{domain}"
+
+if authelia_pass:
+    authelia_text = f"""Tes identifiants Authelia (c'est *par là* que tu te connectes) :
+
+  utilisateur : {slug}
+  mot de passe : {authelia_pass}
+
+Pense à le changer dès la première connexion via https://auth.maudet.cloud/.
+
+"""
+    authelia_html = f"""<p>Tes identifiants <b>Authelia</b> (c'est <i>par là</i> que tu te connectes) :</p>
+<ul>
+  <li>utilisateur : <code>{slug}</code></li>
+  <li>mot de passe : <code>{authelia_pass}</code></li>
+</ul>
+<p>Pense à le changer dès la première connexion via <a href="https://auth.maudet.cloud/">https://auth.maudet.cloud/</a>.</p>
+"""
+else:
+    authelia_text = "(Compte Authelia déjà existant pour ce slug — pas de mot de passe joint.)\n\n"
+    authelia_html = "<p><i>Compte Authelia déjà existant pour ce slug — pas de mot de passe joint.</i></p>"
 
 text = f"""Bonjour {name},
 
 Tu as un accès à la plateforme de dev Twake (Cozy) que j'héberge.
 
-Définis directement ton mot de passe ici (lien à usage unique, valable 24h) :
-{renew}
-
-Une fois ton mot de passe choisi, ta page de connexion habituelle est :
+{authelia_text}Ta page d'entrée :
 {base}/
+  → tu seras redirigé sur auth.maudet.cloud
+  → après login, tu retombes sur ta Cozy.
+
+(Optionnel — back-up Cozy passphrase, ne sert que si on coupe Authelia)
+Définis-le ici, lien à usage unique valable 24h :
+{renew}
 
 Ton compte vient pré-installé avec les apps standard (Drive, Photos, Contacts, Notes,
 Passwords, Settings, Store, Home), Twake Drive patché, ainsi que les coquilles maison :
@@ -125,10 +204,14 @@ Michel
 
 html = f"""<p>Bonjour {name},</p>
 <p>Tu as un accès à la plateforme de dev <b>Twake (Cozy)</b> que j'héberge.</p>
-<p>Définis directement ton mot de passe ici (lien à usage unique, valable 24h) :<br>
-<a href="{renew}">{renew}</a></p>
-<p>Une fois ton mot de passe choisi, ta page de connexion habituelle est :<br>
-<a href="{base}/">{base}/</a></p>
+{authelia_html}
+<p><b>Ta page d'entrée</b> :<br>
+<a href="{base}/">{base}/</a><br>
+&nbsp;&nbsp;→ tu seras redirigé sur <code>auth.maudet.cloud</code><br>
+&nbsp;&nbsp;→ après login, tu retombes sur ta Cozy.</p>
+<p><i>Optionnel — back-up Cozy passphrase, ne sert que si on coupe Authelia.
+Définis-le ici, lien à usage unique valable 24h :<br>
+<a href="{renew}">{renew}</a></i></p>
 <p>Ton compte vient pré-installé avec les apps standard (Drive, Photos, Contacts, Notes,
 Passwords, Settings, Store, Home), <b>Twake Drive patché</b>, ainsi que les coquilles maison :</p>
 <ul>
@@ -164,5 +247,7 @@ print(f"Sent → {to} (bcc: {BCC})")
 PY
 
 echo
-echo "== Done. Renew URL (also sent in the email):"
-echo "$RENEW_URL"
+echo "== Done."
+echo "   Authelia user : $SLUG"
+[ -n "$AUTHELIA_PASS" ] && echo "   Authelia pass : $AUTHELIA_PASS"
+echo "   Cozy renew    : $RENEW_URL"
