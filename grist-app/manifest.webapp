@@ -60,5 +60,13 @@
       "public": false
     }
   },
-  "intents": []
+  "intents": [],
+  "services": {
+    "cleanup-grist": {
+      "type": "node",
+      "file": "services/cleanup-grist.js",
+      "trigger": "@event io.cozy.files:DELETED",
+      "debounce": "10s"
+    }
+  }
 }
