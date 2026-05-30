@@ -10,13 +10,27 @@
 
 import { generateWebLink } from 'cozy-client'
 
+// cozy-client sometimes exposes the file name at the top level, sometimes
+// only inside `attributes` (depending on the doctype model the consumer
+// uses). Look in both spots so we don't silently miss the dispatch in
+// FilesViewer like we did before.
+function fileName(file) {
+  return (
+    (file && typeof file.name === 'string' && file.name) ||
+    (file && file.attributes && typeof file.attributes.name === 'string' && file.attributes.name) ||
+    ''
+  )
+}
+
+function fileId(file) {
+  return (file && (file._id || file.id)) || ''
+}
+
 const HANDLERS = [
   {
-    matches: file =>
-      typeof file?.name === 'string' &&
-      file.name.toLowerCase().endsWith('.excalidraw'),
+    matches: file => fileName(file).toLowerCase().endsWith('.excalidraw'),
     slug: 'excalidraw',
-    hash: file => `/edit/${file._id || file.id}`
+    hash: file => `/edit/${fileId(file)}`
   }
 ]
 
@@ -43,6 +57,8 @@ export function redirectToExternalAppIfNeeded(client, file) {
   const handler = findExternalAppHandler(file)
   if (!handler) return false
   const url = externalAppUrl(client, file, handler)
-  window.location.href = url
+  // eslint-disable-next-line no-console
+  console.info('[drive] external-app redirect:', fileName(file), '→', url)
+  window.location.replace(url)
   return true
 }
