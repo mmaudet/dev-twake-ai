@@ -24,6 +24,12 @@ interface ComputeFileTypeOptions {
   cozyUrl?: string
 }
 
+// .excalidraw is a regular file (the bundled editor in our `excalidraw`
+// coquille reads/writes its JSON content). We match by extension since
+// the Drive doesn't attach a special mime to it.
+const isExcalidraw = (file: File): boolean =>
+  typeof file.name === 'string' && file.name.toLowerCase().endsWith('.excalidraw')
+
 interface ComputePathOptions {
   type: string
   pathname: string
@@ -64,6 +70,8 @@ export const computeFileType = (
     }
   } else if (isDocs(file)) {
     return 'docs'
+  } else if (isExcalidraw(file)) {
+    return 'excalidraw'
   } else if (shouldBeOpenedByOnlyOffice(file) && isOfficeEnabled) {
     return 'onlyoffice'
   } else if (isNextcloudShortcut(file)) {
@@ -88,6 +96,8 @@ export const computeApp = (type: string): string => {
       return 'notes'
     case 'docs':
       return 'docs'
+    case 'excalidraw':
+      return 'excalidraw'
     default:
       return 'drive'
   }
@@ -130,6 +140,8 @@ export const computePath = (
       }
     case 'docs':
       return `/bridge/docs/${(file as IOCozyFile).metadata.externalId}`
+    case 'excalidraw':
+      return `/edit/${file._id}`
     case 'shortcut':
       return `/external/${file._id}`
     case 'directory':
