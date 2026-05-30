@@ -1,0 +1,48 @@
+{
+  "name": "Dashboard",
+  "slug": "dashboard",
+  "icon": "icon.svg",
+  "categories": [],
+  "version": "0.1.0",
+  "licence": "AGPL-3.0",
+  "editor": "mmaudet",
+  "source": "file:///home/mmaudet/work/dev.twake.ai/dashboard-app",
+  "developer": {
+    "name": "mmaudet",
+    "url": ""
+  },
+  "routes": {
+    "/": {
+      "folder": "/",
+      "index": "index.html",
+      "public": false
+    }
+  },
+  "permissions": {
+    "apps": {
+      "description": "Required by the cozy-bar to display the icons of the apps",
+      "type": "io.cozy.apps",
+      "verbs": ["GET"]
+    },
+    "settings": {
+      "description": "Persist dashboard layout + widget config (API keys)",
+      "type": "io.cozy.settings",
+      "verbs": ["GET", "PUT", "POST", "PATCH"]
+    },
+    "files": {
+      "description": "Read recent files/notes, create new notes, upload via Quick capture",
+      "type": "io.cozy.files",
+      "verbs": ["GET", "POST", "PUT", "PATCH"]
+    }
+  },
+  "locales": {
+    "en": {
+      "short_description": "Personal dashboard with reorganizable widgets",
+      "long_description": "Drag-and-drop dashboard showing recent files, notes, tasks and a quick capture widget."
+    },
+    "fr": {
+      "short_description": "Tableau de bord personnel avec widgets réorganisables",
+      "long_description": "Dashboard drag-and-drop avec fichiers récents, notes, tâches et capture rapide."
+    }
+  }
+}

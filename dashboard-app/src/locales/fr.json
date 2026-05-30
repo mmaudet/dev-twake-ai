@@ -1,0 +1,9 @@
+{
+  "appTitle": "Tableau de bord",
+  "widgets": {
+    "recentFiles":  { "title": "Fichiers récents" },
+    "recentNotes":  { "title": "Notes récentes" },
+    "tasks":        { "title": "Tâches (kan.bn)" },
+    "quickCapture": { "title": "Capture rapide" }
+  }
+}

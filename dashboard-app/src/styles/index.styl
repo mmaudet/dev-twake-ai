@@ -1,0 +1,68 @@
+.dashboard-grid
+  min-height 100%
+
+.dashboard-widget-cell
+  height 100%
+
+.dashboard-widget-card
+  height 100%
+  display flex
+  flex-direction column
+  background-color var(--paperBackgroundColor, white)
+  box-shadow 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08)
+  border-radius 6px
+  overflow hidden
+
+.widget-drag-handle
+  cursor move
+  user-select none
+  background-color rgba(0,0,0,0.02)
+
+.dashboard-widget-body
+  overflow auto
+
+// react-grid-layout overrides for nicer drag feedback
+.react-grid-item.react-grid-placeholder
+  background rgba(0, 122, 255, 0.15) !important
+  border 2px dashed rgba(0, 122, 255, 0.4) !important
+  border-radius 6px
+
+// Plain lists used inside widgets
+.dashboard-list
+  list-style none
+  padding 0
+  margin 0
+
+.dashboard-list-item
+  display flex
+  align-items center
+  gap 8px
+  padding 6px 8px
+  border-radius 4px
+  cursor pointer
+  transition background-color 0.1s
+
+  &:hover
+    background-color rgba(0,0,0,0.04)
+
+.dashboard-list-icon
+  flex-shrink 0
+  color var(--secondaryTextColor, #95999d)
+
+.dashboard-list-text
+  min-width 0
+  flex 1
+
+.dashboard-list-primary
+  font-size 14px
+  font-weight 500
+  white-space nowrap
+  overflow hidden
+  text-overflow ellipsis
+
+.dashboard-list-secondary
+  font-size 12px
+  color var(--secondaryTextColor, #95999d)
+  white-space nowrap
+  overflow hidden
+  text-overflow ellipsis

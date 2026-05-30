@@ -1,0 +1,9 @@
+{
+  "appTitle": "Dashboard",
+  "widgets": {
+    "recentFiles":  { "title": "Recent files" },
+    "recentNotes":  { "title": "Recent notes" },
+    "tasks":        { "title": "Tasks (kan.bn)" },
+    "quickCapture": { "title": "Quick capture" }
+  }
+}
