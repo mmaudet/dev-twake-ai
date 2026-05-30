@@ -4,15 +4,14 @@ import { Q, useQuery, useClient } from 'cozy-client'
 import Icon from 'cozy-ui/transpiled/react/Icon'
 import Spinner from 'cozy-ui/transpiled/react/Spinner'
 
+// Same logic as RecentFiles: sort on updated_at (the only field with a
+// default index) and filter client-side for class === 'note'.
 const notesQuery = () =>
   Q('io.cozy.files')
-    .where({
-      class: 'note',
-      trashed: false
-    })
-    .indexFields(['class', 'updated_at'])
-    .sortBy([{ class: 'desc' }, { updated_at: 'desc' }])
-    .limitBy(10)
+    .where({ trashed: false })
+    .indexFields(['updated_at'])
+    .sortBy([{ updated_at: 'desc' }])
+    .limitBy(40)
 
 const formatDate = ts => {
   if (!ts) return ''
@@ -39,7 +38,7 @@ const RecentNotes = () => {
   if (result.fetchStatus === 'loading' || !result.data) {
     return <div className="u-flex u-flex-justify-center u-mt-1"><Spinner size="large" /></div>
   }
-  const notes = (result.data || []).slice(0, 8)
+  const notes = (result.data || []).filter(f => f.class === 'note').slice(0, 8)
   if (notes.length === 0) return <div className="u-c-grey">Aucune note récente.</div>
 
   return (

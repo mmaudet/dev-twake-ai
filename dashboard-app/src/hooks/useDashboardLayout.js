@@ -33,14 +33,14 @@ const useDashboardLayout = () => {
     let cancelled = false
     const fetch = async () => {
       try {
-        const { data } = await client.stackClient.fetchJSON(
+        const doc = await client.stackClient.fetchJSON(
           'GET',
           `/data/io.cozy.settings/${encodeURIComponent(SETTING_ID)}`
         )
         if (cancelled) return
-        revRef.current = data._rev
-        if (data.layouts) setLayouts(data.layouts)
-        if (data.config) setConfig({ ...DEFAULT_CONFIG, ...data.config })
+        revRef.current = doc._rev
+        if (doc.layouts) setLayouts(doc.layouts)
+        if (doc.config) setConfig({ ...DEFAULT_CONFIG, ...doc.config })
       } catch (err) {
         // 404 = doc doesn't exist yet, fine — keep defaults
         if (err.status !== 404) {
@@ -76,12 +76,12 @@ const useDashboardLayout = () => {
           // 409 = conflict, refetch rev and retry once
           if (err.status === 409) {
             try {
-              const { _rev } = await client.stackClient.fetchJSON(
+              const current = await client.stackClient.fetchJSON(
                 'GET',
                 `/data/io.cozy.settings/${encodeURIComponent(SETTING_ID)}`
               )
-              revRef.current = _rev
-              body._rev = _rev
+              revRef.current = current._rev
+              body._rev = current._rev
               const res = await client.stackClient.fetchJSON(
                 'PUT',
                 `/data/io.cozy.settings/${encodeURIComponent(SETTING_ID)}`,
