@@ -4,8 +4,9 @@ import { Q, useQuery, useClient } from 'cozy-client'
 import Icon from 'cozy-ui/transpiled/react/Icon'
 import Spinner from 'cozy-ui/transpiled/react/Spinner'
 
-// Same logic as RecentFiles: sort on updated_at (the only field with a
-// default index) and filter client-side for class === 'note'.
+// Cozy notes are stored as io.cozy.files with mime
+// 'text/vnd.cozy.note+markdown' and a .cozy-note extension. The class
+// field is 'text', not 'note', so we must filter on mime/name instead.
 const notesQuery = () =>
   Q('io.cozy.files')
     .where({ trashed: false })
@@ -25,9 +26,16 @@ const formatDate = ts => {
 }
 
 const buildNoteUrl = (cozyUrl, noteId) => {
+  // Strip the trailing .cozy-note from the file id-as-URL is not needed
+  // because cozy-notes routes by file _id directly.
   const u = new URL(cozyUrl)
   const host = u.host.replace(/^([^.]+)\./, '$1-notes.')
   return `${u.protocol}//${host}/#/n/${noteId}`
+}
+
+const displayName = name => {
+  if (!name) return 'Sans titre'
+  return name.replace(/\.cozy-note$/, '')
 }
 
 const RecentNotes = () => {
@@ -38,7 +46,11 @@ const RecentNotes = () => {
   if (result.fetchStatus === 'loading' || !result.data) {
     return <div className="u-flex u-flex-justify-center u-mt-1"><Spinner size="large" /></div>
   }
-  const notes = (result.data || []).filter(f => f.class === 'note').slice(0, 8)
+  const isNote = f =>
+    f.mime === 'text/vnd.cozy.note+markdown' ||
+    f.class === 'note' ||
+    (f.name && f.name.endsWith('.cozy-note'))
+  const notes = (result.data || []).filter(isNote).slice(0, 8)
   if (notes.length === 0) return <div className="u-c-grey">Aucune note récente.</div>
 
   return (
@@ -51,7 +63,7 @@ const RecentNotes = () => {
         >
           <Icon icon="file-type-text" size={20} className="dashboard-list-icon" />
           <div className="dashboard-list-text">
-            <div className="dashboard-list-primary">{note.name || 'Sans titre'}</div>
+            <div className="dashboard-list-primary">{displayName(note.name)}</div>
             <div className="dashboard-list-secondary">{formatDate(note.updated_at || note.created_at)}</div>
           </div>
         </li>

@@ -31,24 +31,49 @@ const buildDriveFileUrl = (cozyUrl, dirId, fileId) => {
   return `${u.protocol}//${host}/#/folder/${dirId}/file/${fileId}`
 }
 
-// Shortcuts (.url files) store their target inside their binary as
-// "[InternetShortcut]\nURL=https://...". Download and parse to redirect
-// straight to the target instead of opening Drive.
-const fetchShortcutTarget = async (client, fileId) => {
-  const res = await client.stackClient.fetch('GET', `/files/download/${fileId}`)
-  if (!res.ok) throw new Error(`download ${res.status}`)
-  const text = await res.text()
-  const m = text.match(/^URL=(.+)$/m)
-  return m ? m[1].trim() : null
+// cozy-stack exposes GET /shortcuts/:id which returns the resolved URL +
+// the parsed target metadata as JSON (when Accept: application/json).
+const fetchShortcutInfo = async (client, fileId) => {
+  const json = await client.stackClient.fetchJSON('GET', `/shortcuts/${fileId}`)
+  return (json && json.data && json.data.attributes) || null
+}
+
+const buildGristUrl = (cozyUrl, target) => {
+  // The URL embedded in grist-created shortcuts is malformed
+  // ("/#/doc/<id>") and lands on the Grist home → "Document not found".
+  // Reconstruct the canonical path-based URL from metadata.target.
+  const u = new URL(cozyUrl)
+  const host = u.host.replace(/^([^.]+)\./, '$1-grist.')
+  const org = target.orgDomain || 'twake-dev'
+  return `${u.protocol}//${host}/o/${org}/${target.docId}`
+}
+
+const resolveShortcutUrl = info => {
+  if (!info) return null
+  const target = info.metadata && info.metadata.target
+  if (target && target.app === 'grist' && target.docId) {
+    // Use the inferred Grist URL even if info.url is present, because the
+    // stored URL has been observed to be malformed.
+    return null  // Caller will use buildGristUrl with the cozy host context
+  }
+  return info.url || null
 }
 
 const openFile = async (client, cozyUrl, file) => {
   if (file.class === 'shortcut') {
     try {
-      const target = await fetchShortcutTarget(client, file._id)
-      if (target) {
-        window.open(target, '_blank')
-        return
+      const info = await fetchShortcutInfo(client, file._id)
+      if (info) {
+        const target = info.metadata && info.metadata.target
+        if (target && target.app === 'grist' && target.docId) {
+          window.open(buildGristUrl(cozyUrl, target), '_blank')
+          return
+        }
+        const url = resolveShortcutUrl(info)
+        if (url) {
+          window.open(url, '_blank')
+          return
+        }
       }
     } catch (e) {
       // eslint-disable-next-line no-console
@@ -66,8 +91,12 @@ const RecentFiles = () => {
   if (result.fetchStatus === 'loading' || !result.data) {
     return <div className="u-flex u-flex-justify-center u-mt-1"><Spinner size="large" /></div>
   }
+  const isNote = f =>
+    f.mime === 'text/vnd.cozy.note+markdown' ||
+    f.class === 'note' ||
+    (f.name && f.name.endsWith('.cozy-note'))
   const files = (result.data || [])
-    .filter(f => f.type === 'file' && f.class !== 'note')
+    .filter(f => f.type === 'file' && !isNote(f))
     .slice(0, 8)
   if (files.length === 0) return <div className="u-c-grey">Aucun fichier récent.</div>
 

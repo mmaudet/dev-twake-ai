@@ -1,9 +1,9 @@
 import React, { useRef, useState } from 'react'
-import { useClient } from 'cozy-client'
+import { useClient, Q } from 'cozy-client'
 
 import Button from 'cozy-ui/transpiled/react/Button'
 import TextField from 'cozy-ui/transpiled/react/MuiCozyTheme/TextField'
-import { Dialog, DialogTitle, DialogContent, DialogActions } from 'cozy-ui/transpiled/react/Dialog'
+import Dialog, { DialogTitle, DialogContent, DialogActions } from 'cozy-ui/transpiled/react/Dialog'
 import Alerter from 'cozy-ui/transpiled/react/Alerter'
 
 const buildAppUrl = (cozyUrl, slug, path = '/') => {
@@ -26,10 +26,8 @@ const QuickCapture = ({ config }) => {
   const onNewNote = async () => {
     setBusy(true)
     try {
-      // Find the user's root dir id
       const rootDir = await client.stackClient.fetchJSON('GET', '/files/io.cozy.files.root-dir')
       const dirId = rootDir.data ? rootDir.data.id : 'io.cozy.files.root-dir'
-      // Create note via the notes API of cozy-stack
       const res = await client.stackClient.fetchJSON('POST', '/notes', {
         data: {
           type: 'io.cozy.notes.documents',
@@ -48,6 +46,10 @@ const QuickCapture = ({ config }) => {
       })
       const noteId = res.data && res.data.id
       if (noteId) {
+        // Force cozy-client to refetch so RecentNotes shows the new note
+        // when the user comes back to the dashboard.
+        try { await client.query(Q('io.cozy.files').where({trashed:false}).indexFields(['updated_at']).sortBy([{updated_at:'desc'}]).limitBy(40), { as: 'recentNotes' }) } catch (_) {}
+        try { await client.query(Q('io.cozy.files').where({trashed:false}).indexFields(['updated_at']).sortBy([{updated_at:'desc'}]).limitBy(40), { as: 'recentFiles' }) } catch (_) {}
         window.open(buildAppUrl(cozyUrl, 'notes', `/#/n/${noteId}`), '_blank')
       }
     } catch (e) {
