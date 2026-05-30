@@ -87,6 +87,23 @@ echo "== Syncing $src_dir → $dst_dir"
 mkdir -p "$dst_dir"
 rsync -a --delete "$src_dir/" "$dst_dir/"
 
+# Cache-bust the static asset references in index.html so browsers
+# don't keep serving an outdated bar.js / editor.js after a deploy.
+# (cozy-stack already adds hashed filenames to the built Drive bundle,
+# so this only matters for our home-grown coquilles which ship
+# unhashed files like editor.js + bar.js. We append ?v=<8-char md5>.)
+if [ -f "$dst_dir/index.html" ]; then
+  echo "== Adding cache-busters to index.html"
+  for asset in bar.js bar.css editor.js editor.css; do
+    [ -f "$dst_dir/$asset" ] || continue
+    h=$(md5sum "$dst_dir/$asset" | cut -c1-8)
+    # Replace either the bare reference (first deploy) or a previous
+    # ?v=… tag (subsequent deploy). Cover both " and ' quoted forms.
+    sed -i -E "s|([\"'])${asset}([?][^\"']*)?([\"'])|\1${asset}?v=${h}\3|g" \
+      "$dst_dir/index.html"
+  done
+fi
+
 echo "== Updating $slug on every instance"
 mapfile -t instances < <(cozy-stack instances ls 2>/dev/null | awk '{print $1}')
 if [ "${#instances[@]}" -eq 0 ]; then
