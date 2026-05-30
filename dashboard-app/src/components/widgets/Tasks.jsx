@@ -54,7 +54,7 @@ const fetchKanbnTasks = async apiKey => {
               boardName: board.name,
               listName: list.name,
               dueDate: card.dueDate,
-              url: `https://kanbn.dev-twake.maudet.cloud/boards/${boardId}`
+              url: `https://kanbn.dev-twake.maudet.cloud/boards/${boardId}?cardId=${card.publicId || card.id}`
             })
           }
         }
