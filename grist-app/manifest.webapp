@@ -48,9 +48,9 @@
       "verbs": ["GET"]
     },
     "files": {
-      "description": "Required by cozy-bar (recent files / search)",
+      "description": "Required to materialize Grist shortcuts in the Drive and keep their name in sync with the Grist doc title.",
       "type": "io.cozy.files",
-      "verbs": ["GET", "POST"]
+      "verbs": ["GET", "POST", "PATCH"]
     }
   },
   "routes": {
@@ -65,8 +65,7 @@
     "cleanup-grist": {
       "type": "node",
       "file": "services/cleanup-grist.js",
-      "trigger": "@event io.cozy.files:DELETED",
-      "debounce": "10s"
+      "trigger": "@event io.cozy.files:DELETED"
     }
   }
 }
