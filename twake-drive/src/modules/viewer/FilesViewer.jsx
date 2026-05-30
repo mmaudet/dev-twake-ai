@@ -23,6 +23,7 @@ import { useCurrentFileId } from '@/hooks'
 import { useMoreMenuActions } from '@/hooks/useMoreMenuActions'
 import logger from '@/lib/logger'
 import { navigateToModal } from '@/modules/actions/helpers'
+import { redirectToExternalAppIfNeeded } from '@/modules/viewer/externalAppRedirect'
 import Fallback from '@/modules/viewer/Fallback'
 import MoreMenu from '@/modules/viewer/MoreMenu'
 import {
@@ -141,6 +142,16 @@ const FilesViewer = ({ filesQuery, files, onClose, onChange, viewerProps }) => {
     () => (hasCurrentIndex ? currentIndex : 0),
     [hasCurrentIndex, currentIndex]
   )
+
+  // If the current file belongs to a Cozy coquille that owns its
+  // own editor (.excalidraw lives in the `excalidraw` coquille for
+  // example), don't render the built-in preview at all — bounce to
+  // the coquille so the user gets the editor they actually want
+  // regardless of how they navigated here (Dashboard widget, shared
+  // URL, deep link, etc.).
+  useEffect(() => {
+    redirectToExternalAppIfNeeded(client, viewerFiles[viewerIndex])
+  }, [client, viewerIndex, viewerFiles])
 
   const actions = useMoreMenuActions(currentFile ?? {})
 

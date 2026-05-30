@@ -22,6 +22,7 @@ import Viewer, {
 import { translate, useI18n } from 'twake-i18n'
 
 import { ensureFileHasPath } from '@/components/FilesRealTimeQueries'
+import { redirectToExternalAppIfNeeded } from '@/modules/viewer/externalAppRedirect'
 import Fallback from '@/modules/viewer/Fallback'
 import {
   isOfficeEnabled,
@@ -57,6 +58,13 @@ const FileOpener = props => {
         const result = await client.query(query.definition(), query.options)
 
         const file = await ensureFileHasPath(result.data, client)
+
+        // .excalidraw files (and any future external-coquille types)
+        // own their own editor; skip the built-in preview and bounce
+        // straight to the right app.
+        if (redirectToExternalAppIfNeeded(client, file)) {
+          return
+        }
 
         setState({ file, loading: false })
       } catch (_e) {
