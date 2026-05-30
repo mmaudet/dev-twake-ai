@@ -11,6 +11,10 @@
 /twake-drive/dist/
 /twake-drive/.cache/
 
+# Build artifacts of the excalidraw editor bundle
+/excalidraw-app-build/node_modules/
+/excalidraw-app-build/dist/
+
 # Misc
 *.log
 .DS_Store

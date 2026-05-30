@@ -1,0 +1,17 @@
+{
+  "name": "excalidraw-editor-build",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Bundled @excalidraw/excalidraw editor for the Cozy excalidraw coquille — load/save .excalidraw files from the user's Twake Drive via cozy-stack.",
+  "scripts": {
+    "build": "esbuild src/main.jsx --bundle --minify --target=es2020 --jsx=automatic --loader:.css=css --loader:.svg=dataurl --loader:.png=dataurl --loader:.woff=dataurl --loader:.woff2=dataurl --loader:.ttf=dataurl --define:process.env.NODE_ENV=\\\"production\\\" --define:global=globalThis --conditions=production,browser --outfile=dist/editor.js"
+  },
+  "dependencies": {
+    "@excalidraw/excalidraw": "^0.18.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.21.0"
+  }
+}
