@@ -38,42 +38,19 @@ const fetchShortcutInfo = async (client, fileId) => {
   return (json && json.data && json.data.attributes) || null
 }
 
-const buildGristUrl = (cozyUrl, target) => {
-  // The URL embedded in grist-created shortcuts is malformed
-  // ("/#/doc/<id>") and lands on the Grist home → "Document not found".
-  // Reconstruct the canonical path-based URL from metadata.target.
-  const u = new URL(cozyUrl)
-  const host = u.host.replace(/^([^.]+)\./, '$1-grist.')
-  const org = target.orgDomain || 'twake-dev'
-  return `${u.protocol}//${host}/o/${org}/${target.docId}`
-}
-
-const resolveShortcutUrl = info => {
-  if (!info) return null
-  const target = info.metadata && info.metadata.target
-  if (target && target.app === 'grist' && target.docId) {
-    // Use the inferred Grist URL even if info.url is present, because the
-    // stored URL has been observed to be malformed.
-    return null  // Caller will use buildGristUrl with the cozy host context
-  }
-  return info.url || null
-}
-
 const openFile = async (client, cozyUrl, file) => {
   if (file.class === 'shortcut') {
     try {
       const info = await fetchShortcutInfo(client, file._id)
-      if (info) {
-        const target = info.metadata && info.metadata.target
-        if (target && target.app === 'grist' && target.docId) {
-          window.open(buildGristUrl(cozyUrl, target), '_blank')
-          return
-        }
-        const url = resolveShortcutUrl(info)
-        if (url) {
-          window.open(url, '_blank')
-          return
-        }
+      // Trust the URL the coquille that materialized the shortcut put on it
+      // (e.g. the grist coquille stores `https://<slug>-grist.<domain>/#/doc/<id>`
+      // and its hash router opens the right iframe). An older grist version
+      // stored the canonical Grist URL directly, which also still works — both
+      // shapes resolve correctly, so we no longer special-case grist here.
+      const url = info && info.url
+      if (url) {
+        window.open(url, '_blank')
+        return
       }
     } catch (e) {
       // eslint-disable-next-line no-console
