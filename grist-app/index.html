@@ -72,6 +72,12 @@
     const cozyToken = root.dataset.cozyToken;
     const cozyDomain = root.dataset.cozyDomain;
 
+    // Debug gate for [grist] traces (title sync, bridge create). Enabled with
+    // ?debug=1. Off in prod so the user's console isn't filled with our noise.
+    const DEBUG = new URLSearchParams(location.search).get('debug') === '1';
+    function dbg() { if (DEBUG) console.log.apply(console, arguments); }
+    function dbgWarn() { if (DEBUG) console.warn.apply(console, arguments); }
+
     function renderIframe(src) {
       root.innerHTML = '';
       const f = document.createElement('iframe');
@@ -173,7 +179,7 @@
         })
       });
       if (!res.ok) {
-        console.warn('[grist] _find failed:', res.status, await res.text());
+        dbgWarn('[grist] _find failed:', res.status, await res.text());
         return null;
       }
       const body = await res.json();
@@ -194,25 +200,25 @@
           fetchGristDocName(docId),
           findShortcutByDocId(docId)
         ]);
-        if (!gristName) { console.log('[grist] title sync: Grist name not fetchable'); return; }
-        if (!shortcut) { console.log('[grist] title sync: no Drive shortcut found for docId', docId); return; }
+        if (!gristName) { dbg('[grist] title sync: Grist name not fetchable'); return; }
+        if (!shortcut) { dbg('[grist] title sync: no Drive shortcut found for docId', docId); return; }
         // .url suffix is required by the Drive to keep the icon/handler.
         const want = gristName + '.url';
         const currentInitial = (shortcut.attributes && shortcut.attributes.name) || shortcut.name || '';
-        if (currentInitial === want) { console.log('[grist] title sync: already in sync', currentInitial); return; }
+        if (currentInitial === want) { dbg('[grist] title sync: already in sync', currentInitial); return; }
         const fileId = shortcut.id || shortcut._id;
         // Re-fetch right before PATCH to catch the case where the user
         // renamed the shortcut from the Drive UI while we were preparing
         // the sync — abort rather than blindly overwriting their change.
         const fresh = await findShortcutByDocId(docId);
-        if (!fresh) { console.log('[grist] title sync: shortcut disappeared mid-sync, aborting'); return; }
+        if (!fresh) { dbg('[grist] title sync: shortcut disappeared mid-sync, aborting'); return; }
         const currentFresh = (fresh.attributes && fresh.attributes.name) || fresh.name || '';
         if (currentFresh !== currentInitial) {
-          console.log('[grist] title sync: shortcut renamed concurrently in Drive (' + currentInitial + ' → ' + currentFresh + '), aborting');
+          dbg('[grist] title sync: shortcut renamed concurrently in Drive (' + currentInitial + ' → ' + currentFresh + '), aborting');
           return;
         }
-        if (currentFresh === want) { console.log('[grist] title sync: already in sync (fresh)', currentFresh); return; }
-        console.log('[grist] title sync:', currentFresh, '→', want, '(fileId', fileId + ')');
+        if (currentFresh === want) { dbg('[grist] title sync: already in sync (fresh)', currentFresh); return; }
+        dbg('[grist] title sync:', currentFresh, '→', want, '(fileId', fileId + ')');
         const url = 'https://' + cozyDomain + '/files/' + fileId;
         const res = await fetch(url, {
           method: 'PATCH',
@@ -231,10 +237,10 @@
             }
           })
         });
-        if (!res.ok) console.warn('[grist] title sync PATCH', res.status, await res.text());
-        else console.log('[grist] title sync OK');
+        if (!res.ok) dbgWarn('[grist] title sync PATCH', res.status, await res.text());
+        else dbg('[grist] title sync OK');
       } catch (e) {
-        console.warn('[grist] title sync failed:', e);
+        dbgWarn('[grist] title sync failed:', e);
       }
     }
 
@@ -279,8 +285,15 @@
       // Grist runs in single-org mode (GRIST_SINGLE_ORG=twake-dev). The /api/orgs
       // response always includes the user's auto-provisioned "docs-N" personal org
       // alongside the canonical one, so we must prefer the non-personal one
-      // (anything that isn't a Grist-managed personal sandbox).
-      const org = orgs.find(o => !/^docs-\d+$/.test(o.domain || '')) || orgs[0];
+      // (anything that isn't a Grist-managed personal sandbox). If we only see
+      // personal sandboxes, surface that explicitly rather than silently dropping
+      // the new doc into the user's personal "docs-N" space — that would create
+      // a Drive shortcut pointing into a sandbox the user can't share.
+      const org = orgs.find(o => !/^docs-\d+$/.test(o.domain || ''));
+      if (!org) {
+        const personals = orgs.map(o => o.domain).filter(Boolean).join(', ');
+        throw new Error('Aucune organisation partagée Grist disponible (seulement des sandboxes personnels : ' + personals + '). Demande à l\'administrateur de te rattacher à l\'organisation "twake-dev".');
+      }
 
       // 2. find first workspace in the chosen org
       res = await gristFetch('/api/orgs/' + org.id + '/workspaces');
