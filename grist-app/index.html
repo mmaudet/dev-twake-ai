@@ -198,10 +198,21 @@
         if (!shortcut) { console.log('[grist] title sync: no Drive shortcut found for docId', docId); return; }
         // .url suffix is required by the Drive to keep the icon/handler.
         const want = gristName + '.url';
-        const current = (shortcut.attributes && shortcut.attributes.name) || shortcut.name || '';
-        if (current === want) { console.log('[grist] title sync: already in sync', current); return; }
+        const currentInitial = (shortcut.attributes && shortcut.attributes.name) || shortcut.name || '';
+        if (currentInitial === want) { console.log('[grist] title sync: already in sync', currentInitial); return; }
         const fileId = shortcut.id || shortcut._id;
-        console.log('[grist] title sync:', current, '→', want, '(fileId', fileId + ')');
+        // Re-fetch right before PATCH to catch the case where the user
+        // renamed the shortcut from the Drive UI while we were preparing
+        // the sync — abort rather than blindly overwriting their change.
+        const fresh = await findShortcutByDocId(docId);
+        if (!fresh) { console.log('[grist] title sync: shortcut disappeared mid-sync, aborting'); return; }
+        const currentFresh = (fresh.attributes && fresh.attributes.name) || fresh.name || '';
+        if (currentFresh !== currentInitial) {
+          console.log('[grist] title sync: shortcut renamed concurrently in Drive (' + currentInitial + ' → ' + currentFresh + '), aborting');
+          return;
+        }
+        if (currentFresh === want) { console.log('[grist] title sync: already in sync (fresh)', currentFresh); return; }
+        console.log('[grist] title sync:', currentFresh, '→', want, '(fileId', fileId + ')');
         const url = 'https://' + cozyDomain + '/files/' + fileId;
         const res = await fetch(url, {
           method: 'PATCH',
