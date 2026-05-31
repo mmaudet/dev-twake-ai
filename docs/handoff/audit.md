@@ -34,6 +34,25 @@ Trois statuts par finding :
 | Medium | Grist : fallback silencieux sur `orgs[0]` (sandbox personnelle) | `grist-app/index.html` bridge create | `ae6bf772e` `[audit]` sur `feature/grist` |
 | Medium | `console.log` / `console.warn` `[grist]` visibles en prod | `grist-app/index.html` | `ae6bf772e` |
 
+### 1.3. Bug remonté en prod (troisième vague)
+
+| Sévérité | Finding | Fichier | Commit |
+|----------|---------|---------|--------|
+| High | Dashboard widgets Mail/Calendar : refresh_token Linagora rejeté → backend renvoie 500 au lieu de NOT_CONNECTED | `dashboard-backend/tokens.js`, `dashboard-backend/server.js` | `643a5daae` `[audit]` sur `feature/dashboard` |
+
+**Reproduction** (constatée live le 2026-05-31 ~22:24 FR) :
+- `/api/status` rapportait `connected: true` pour mail/calendar avec `expires_at` dans le passé (mail expiré depuis 22h, calendar depuis 14h).
+- `/api/mail/recent` et `/api/calendar/day` : `HTTP 500 {"error":"Refresh failed: 400 invalid_grant"}`.
+- Le front affichait juste « Erreur : HTTP 500 », sans CTA pour reconnecter.
+
+**Cause** : `refreshTokens()` throw `new Error('Refresh failed: ...')` (sans `code`). Les routes catch ne mappent que `e.code === 'NOT_CONNECTED'` → 401, le reste → 500.
+
+**Fix `643a5daae`** :
+- `tokens.js:refreshTokens` : un 4xx OIDC sur `/oauth2/token` (`invalid_grant`, `invalid_client`…) signifie que le refresh_token est mort. On `clearTokens(widget)` + throw `NOT_CONNECTED` propre. Les 5xx et erreurs réseau restent transients (bubble up en 500).
+- `server.js:statusFor` : `connected = !isExpired(tokens) || !!tokens.refresh_token` au lieu de `!!tokens?.access_token`. Le front voit `connected: false` dès que les tokens ne sont plus exploitables, sans devoir roundtripper sur un endpoint qui crash.
+
+**Déploiement requis** : `dashboard-backend/` tourne sur athena (systemd unit), pas sur cozy-stack. Pour appliquer le fix il faut pull la branche `feature/dashboard` et restart le service. Le redéploiement n'est pas automatisé par `scripts/deploy-app.sh` (qui ne gère que les coquilles Cozy).
+
 ### Détails des fixes
 
 #### `04332cf09` — Provision : externalize secrets + password entropy
