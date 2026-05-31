@@ -5,6 +5,7 @@ import {
   getStore,
   clearTokens,
   loadOidcConfig,
+  isExpired,
   VALID_WIDGETS
 } from './tokens.js'
 import { listRecent } from './jmap.js'
@@ -26,10 +27,18 @@ app.use((req, res, next) => {
   next()
 })
 
-const statusFor = tokens => ({
-  connected: !!tokens?.access_token,
-  expires_at: tokens ? (tokens.saved_at || 0) + (tokens.expires_in || 0) : null
-})
+// `connected` reports whether we currently hold something usable. An
+// access_token expired past `isExpired` is only usable if we still have a
+// refresh_token to swap it for — otherwise the front should show "Reconnect"
+// instead of trying to call /api/mail/recent and getting a 401.
+const statusFor = tokens => {
+  if (!tokens?.access_token) {
+    return { connected: false, expires_at: null }
+  }
+  const expires_at = (tokens.saved_at || 0) + (tokens.expires_in || 0)
+  const connected = !isExpired(tokens) || !!tokens.refresh_token
+  return { connected, expires_at }
+}
 
 app.get('/api/status', async (req, res) => {
   try {

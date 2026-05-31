@@ -110,13 +110,15 @@ export const exchangeCode = async (widget, { code, code_verifier, redirect_uri }
   return saveTokens(widget, await res.json())
 }
 
+const notConnected = () => {
+  const err = new Error('NOT_CONNECTED')
+  err.code = 'NOT_CONNECTED'
+  return err
+}
+
 const refreshTokens = async (widget, tokens) => {
   const cfg = await loadOidcConfig()
-  if (!tokens?.refresh_token) {
-    const err = new Error('NOT_CONNECTED')
-    err.code = 'NOT_CONNECTED'
-    throw err
-  }
+  if (!tokens?.refresh_token) throw notConnected()
   const body = new URLSearchParams({
     grant_type: 'refresh_token',
     refresh_token: tokens.refresh_token,
@@ -131,7 +133,19 @@ const refreshTokens = async (widget, tokens) => {
     body
   })
   if (!res.ok) {
-    throw new Error(`Refresh failed: ${res.status} ${await res.text()}`)
+    const bodyText = await res.text()
+    // OIDC says any 4xx on /token (invalid_grant, invalid_client, …) means
+    // the refresh_token is dead and won't come back. Clear it so the front
+    // sees a clean "not connected" instead of being stuck retrying a
+    // refresh that will never succeed, and treat as NOT_CONNECTED upstream.
+    // 5xx and network errors are transient and bubble up as a generic error.
+    if (res.status >= 400 && res.status < 500) {
+      await clearTokens(widget)
+      const err = notConnected()
+      err.detail = `Refresh rejected: ${res.status} ${bodyText}`
+      throw err
+    }
+    throw new Error(`Refresh failed: ${res.status} ${bodyText}`)
   }
   const fresh = await res.json()
   return saveTokens(widget, {
@@ -142,11 +156,7 @@ const refreshTokens = async (widget, tokens) => {
 
 export const getValidAccessToken = async widget => {
   let tokens = await getTokens(widget)
-  if (!tokens) {
-    const err = new Error('NOT_CONNECTED')
-    err.code = 'NOT_CONNECTED'
-    throw err
-  }
+  if (!tokens) throw notConnected()
   if (isExpired(tokens)) {
     tokens = await refreshTokens(widget, tokens)
   }
