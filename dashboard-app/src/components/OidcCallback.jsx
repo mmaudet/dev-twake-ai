@@ -5,7 +5,7 @@ import Spinner from 'cozy-ui/transpiled/react/Spinner'
 import Alerter from 'cozy-ui/transpiled/react/Alerter'
 
 import Sidebar from 'src/components/Sidebar'
-import { BACKEND_BASE } from 'src/utils/backend'
+import { BACKEND_BASE, PKCE_TTL_MS } from 'src/utils/backend'
 
 const OidcCallback = () => {
   const navigate = useNavigate()
@@ -28,6 +28,15 @@ const OidcCallback = () => {
       }
       if (!pkce || pkce.state !== state) {
         setError('State OIDC invalide ou expiré — relance la connexion')
+        return
+      }
+      // Reject stale state: a verifier older than PKCE_TTL_MS will not match
+      // the code Linagora just issued (the SSO has its own short TTL on
+      // authorization codes too, but we don't want to blindly POST a verifier
+      // from yesterday's tab).
+      if (!pkce.created_at || Date.now() - pkce.created_at > PKCE_TTL_MS) {
+        sessionStorage.removeItem('linagora_pkce')
+        setError('Connexion expirée (plus de 5 minutes) — relance depuis le widget')
         return
       }
       try {

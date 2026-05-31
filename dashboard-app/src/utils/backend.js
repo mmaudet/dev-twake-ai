@@ -16,6 +16,12 @@ const sha256base64url = async input => {
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
+// 5 minutes — covers the user clicking the button, the Linagora SSO
+// roundtrip, and a slow tab. Beyond that the stored verifier is stale
+// and the callback should refuse it rather than try to redeem a code
+// that no longer matches.
+export const PKCE_TTL_MS = 5 * 60 * 1000
+
 // Kick off PKCE OIDC for a specific widget. The widget id is stored in
 // sessionStorage alongside the PKCE values so the /oidc/callback view
 // can POST it back to the backend, which then routes the tokens to the
@@ -32,7 +38,7 @@ export const startLinagoraConnect = async widget => {
   const nonce = randString(16)
 
   sessionStorage.setItem('linagora_pkce', JSON.stringify({
-    code_verifier, state, nonce, widget
+    code_verifier, state, nonce, widget, created_at: Date.now()
   }))
 
   const params = new URLSearchParams({
