@@ -39,8 +39,11 @@ Trois statuts par finding :
 | Sévérité | Finding | Fichier | Commit |
 |----------|---------|---------|--------|
 | High | Dashboard widgets Mail/Calendar : refresh_token Linagora rejeté → backend renvoie 500 au lieu de NOT_CONNECTED | `dashboard-backend/tokens.js`, `dashboard-backend/server.js` | `643a5daae` `[audit]` sur `feature/dashboard` |
+| Medium | Dashboard widget RecentFiles : clic sur shortcut Grist ouvrait `<slug>-grist.<domain>/o/<org>/<docId>` (hôte coquille + path Grist) → 404 « Élément non trouvé » | `dashboard-app/src/components/widgets/RecentFiles.jsx:buildGristUrl` | `28f0a5684` `[audit]` sur `feature/dashboard` |
 
-**Reproduction** (constatée live le 2026-05-31 ~22:24 FR) :
+**Reproduction du #2** (constatée live le 2026-05-31 ~23:24 FR) : depuis le widget « Fichiers récents » du dashboard, clic sur le shortcut `Sans titre.url` → ouverture de `https://mmaudet-grist.dev-twake.maudet.cloud/o/twake-dev/<docId>` → page d'erreur Twake Workplace « Élément non trouvé ». Le widget remplaçait l'host du cozyUrl par `<slug>-grist.` mais conservait le path Grist canonique `/o/<org>/<docId>` — pas un format compris ni par cozy-stack (qui retourne 404), ni par le router de la coquille Grist (qui matche `#/doc/<docId>`). Fix : abandonner la reconstruction et utiliser `info.url` du shortcut (déjà bien formé depuis le commit `338ab936b` sur `feature/grist`).
+
+**Reproduction du #1** (constatée live le 2026-05-31 ~22:24 FR) :
 - `/api/status` rapportait `connected: true` pour mail/calendar avec `expires_at` dans le passé (mail expiré depuis 22h, calendar depuis 14h).
 - `/api/mail/recent` et `/api/calendar/day` : `HTTP 500 {"error":"Refresh failed: 400 invalid_grant"}`.
 - Le front affichait juste « Erreur : HTTP 500 », sans CTA pour reconnecter.
