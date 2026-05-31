@@ -262,6 +262,90 @@
       );
     }
 
+    // Open a Grist doc in the iframe, but first verify it still exists on the
+    // Grist side. A Grist doc can be deleted directly in Grist (or by an
+    // admin) without notifying the Drive shortcut — we'd then frame the
+    // Grist "Page non trouvée" page, which is confusing inside the Cozy
+    // shell. Detect that case and offer to remove the stale shortcut from
+    // the Drive.
+    async function openDoc(docId) {
+      let res;
+      try {
+        res = await gristFetch('/api/docs/' + encodeURIComponent(docId));
+      } catch (e) {
+        // Network error — let the iframe attempt to render and show its own
+        // error rather than hiding behind a generic message.
+        renderIframe(GRIST_BASE + '/doc/' + docId);
+        installTitleSync(docId);
+        return;
+      }
+      if (res.status === 401 || res.status === 403) {
+        // Not logged in — let the iframe trigger the OIDC flow.
+        renderIframe(GRIST_BASE + '/doc/' + docId);
+        installTitleSync(docId);
+        return;
+      }
+      if (res.status === 404) {
+        renderOrphanShortcutPane(docId);
+        return;
+      }
+      renderIframe(GRIST_BASE + '/doc/' + docId);
+      installTitleSync(docId);
+    }
+
+    // Render a friendly "this doc is gone" pane with the option to clean up
+    // the Drive shortcut that brought the user here. We can't reliably know
+    // which shortcut it was (we'd have to _find by docId), so we offer the
+    // cleanup as a single button that does the lookup + DELETE.
+    function renderOrphanShortcutPane(docId) {
+      root.innerHTML = '';
+      const div = document.createElement('div');
+      div.className = 'bridge-pane';
+      const title = document.createElement('div');
+      title.innerHTML = '<strong>Ce document Grist n\'existe plus</strong>';
+      const detail = document.createElement('div');
+      detail.style.fontSize = '0.9em';
+      detail.style.color = '#666';
+      detail.textContent = 'Il a probablement été supprimé directement dans Grist. Le raccourci dans ton Drive est désormais orphelin.';
+      div.appendChild(title);
+      div.appendChild(detail);
+
+      const remove = document.createElement('button');
+      remove.textContent = 'Supprimer le raccourci dans Drive';
+      remove.onclick = async () => {
+        remove.disabled = true;
+        remove.textContent = 'Suppression…';
+        const shortcut = await findShortcutByDocId(docId);
+        if (!shortcut) {
+          renderBridgePane('Le raccourci a déjà été supprimé ou est introuvable.',
+            { label: 'Retour à Grist', onClick: () => { location.hash = ''; location.reload(); } });
+          return;
+        }
+        const fileId = shortcut.id || shortcut._id;
+        const res = await fetch('https://' + cozyDomain + '/files/' + fileId, {
+          method: 'DELETE',
+          credentials: 'include',
+          headers: { 'Authorization': 'Bearer ' + cozyToken }
+        });
+        if (!res.ok) {
+          renderBridgePane('Échec de la suppression : HTTP ' + res.status,
+            { label: 'Retour à Grist', onClick: () => { location.hash = ''; location.reload(); } });
+          return;
+        }
+        renderBridgePane('Raccourci déplacé dans la corbeille du Drive.',
+          { label: 'Retour à Grist', onClick: () => { location.hash = ''; location.reload(); } });
+      };
+      div.appendChild(remove);
+
+      const back = document.createElement('button');
+      back.textContent = 'Retour à Grist';
+      back.style.background = '#888';
+      back.onclick = () => { location.hash = ''; location.reload(); };
+      div.appendChild(back);
+
+      root.appendChild(div);
+    }
+
     async function bridgeCreate(folderId) {
       renderBridgePane('Création du document Grist…');
 
@@ -363,8 +447,7 @@
       });
     } else if ((m = hash.match(/^#\/doc\/([^/?#]+)/))) {
       const docId = decodeURIComponent(m[1]);
-      renderIframe(GRIST_BASE + '/doc/' + docId);
-      installTitleSync(docId);
+      openDoc(docId);
     } else {
       renderIframe();
     }
