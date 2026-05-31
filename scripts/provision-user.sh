@@ -19,7 +19,9 @@
 #
 # Prereqs on athena:
 #   ~/.cozy/admin-passphrase.txt   cozy-stack admin passphrase
-#   ~/.cozy/smtp.env               COZY_MAIL_USERNAME, COZY_MAIL_PASSWORD
+#   ~/.cozy/smtp.env               COZY_MAIL_USERNAME, COZY_MAIL_PASSWORD,
+#                                  optional COZY_BCC_EMAIL
+#   ~/.cozy/couchdb.env            COZY_COUCHDB_URL=http://user:pass@host:5984
 #   ssh hermes                     passwordless sudo for the authelia bits
 
 set -euo pipefail
@@ -54,6 +56,13 @@ export COZY_ADMIN_PASSPHRASE="$(cat "$HOME/.cozy/admin-passphrase.txt")"
 
 # shellcheck disable=SC1090
 set -a; . "$HOME/.cozy/smtp.env"; set +a
+# shellcheck disable=SC1090
+set -a; . "$HOME/.cozy/couchdb.env"; set +a
+
+if [ -z "${COZY_COUCHDB_URL:-}" ]; then
+  echo "FAIL: COZY_COUCHDB_URL not set (expected in ~/.cozy/couchdb.env)" >&2
+  exit 1
+fi
 
 #─────────────────────────────────────────────────────────────────────
 # 1. Authelia
@@ -63,7 +72,7 @@ if ssh hermes "sudo grep -qE '^  ${SLUG}:$' $AUTHELIA_DB"; then
   echo "   user '$SLUG' already in Authelia — skipping"
   AUTHELIA_PASS=""
 else
-  AUTHELIA_PASS="$(openssl rand -base64 18 | tr -d '/+=' | head -c 14)Xy!"
+  AUTHELIA_PASS="$(openssl rand -base64 24 | tr -d '/+=' | head -c 20)Xy!"
   echo "== Hashing Authelia password (argon2id)"
   AUTHELIA_HASH=$(ssh hermes \
     "sudo docker exec authelia authelia crypto hash generate argon2 --password '$AUTHELIA_PASS' 2>/dev/null \
@@ -124,7 +133,7 @@ curl -sk -b "$COOKIES" -c "$COOKIES" -X POST "https://${DOMAIN}/auth/passphrase_
 
 echo
 echo "== Reading the reset token from CouchDB"
-RESET_HEX=$(curl -s "http://admin:password@127.0.0.1:5984/global%2Finstances/_find" \
+RESET_HEX=$(curl -s "${COZY_COUCHDB_URL%/}/global%2Finstances/_find" \
   -X POST -H 'Content-Type: application/json' \
   -d "{\"selector\":{\"domain\":\"${DOMAIN}\"}}" \
   | python3 -c "
@@ -227,10 +236,10 @@ Passwords, Settings, Store, Home), <b>Twake Drive patché</b>, ainsi que les coq
 <p>Michel</p>
 """
 
-# Recipients: the new user as primary, plus the operator on bcc so
-# I keep a copy on michel.maudet@gmail.com without leaking that
-# address to the user.
-BCC = "michel.maudet@gmail.com"
+# Recipients: the new user as primary, plus the operator on bcc if
+# COZY_BCC_EMAIL is set in the environment (kept out of the visible
+# headers to avoid leaking it to the user).
+BCC = os.environ.get("COZY_BCC_EMAIL", "").strip()
 
 msg = EmailMessage()
 msg["From"] = f"Michel Maudet <{os.environ['COZY_MAIL_USERNAME']}>"
@@ -239,11 +248,13 @@ msg["Subject"] = "Accès à ta plateforme Twake / Cozy de dev"
 msg.set_content(text)
 msg.add_alternative(html, subtype="html")
 
+recipients = [to] + ([BCC] if BCC else [])
+
 with smtplib.SMTP("smtp.linagora.com", 587, timeout=20) as s:
     s.ehlo(); s.starttls(context=ssl.create_default_context()); s.ehlo()
     s.login(os.environ["COZY_MAIL_USERNAME"], os.environ["COZY_MAIL_PASSWORD"])
-    s.send_message(msg, to_addrs=[to, BCC])
-print(f"Sent → {to} (bcc: {BCC})")
+    s.send_message(msg, to_addrs=recipients)
+print(f"Sent → {to}" + (f" (bcc: {BCC})" if BCC else ""))
 PY
 
 echo
