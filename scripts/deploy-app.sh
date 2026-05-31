@@ -171,9 +171,10 @@ for inst in "${instances[@]}"; do
   fi
   # Healthcheck: cozy-stack apps show must succeed AND report our target_src.
   # An install/update that "succeeded" but left the app in a broken state
-  # (e.g. manifest parse error) is caught here.
+  # (e.g. manifest parse error) is caught here. The show output is JSON, so
+  # we parse it instead of regexing for a non-existent "Source: …" line.
   current_after=$(cozy-stack apps show "$slug" --domain "$inst" 2>/dev/null \
-                  | awk '/^Source/ {print $2}')
+                  | python3 -c "import json,sys; print(json.load(sys.stdin).get('source',''))" 2>/dev/null)
   if [ "$current_after" = "$target_src" ]; then
     printf '    ✓ healthcheck OK\n'
   else
