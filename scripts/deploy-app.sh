@@ -25,6 +25,7 @@
 #   kanbn        kanbn-app/        ~/cozy-apps/kanbn-app/
 #   openproject  openproject-app/  ~/cozy-apps/openproject-app/
 #   n8n          n8n-app/          ~/cozy-apps/n8n-app/
+#   dashboard    dashboard-app/build ~/cozy-apps/dashboard/       (--build runs `yarn build`)
 #   drive        twake-drive/build ~/cozy-apps/drive/             (--build runs `yarn build`)
 
 set -euo pipefail
@@ -60,6 +61,7 @@ case "$slug" in
   kanbn)       src_rel="kanbn-app"        ; dst_dir="$HOME/cozy-apps/kanbn-app"        ;;
   openproject) src_rel="openproject-app"  ; dst_dir="$HOME/cozy-apps/openproject-app"  ;;
   n8n)         src_rel="n8n-app"          ; dst_dir="$HOME/cozy-apps/n8n-app"          ;;
+  dashboard)   src_rel="dashboard-app/build"; dst_dir="$HOME/cozy-apps/dashboard"      ;;
   drive)       src_rel="twake-drive/build"; dst_dir="$HOME/cozy-apps/drive"            ;;
   *) echo "Unknown slug: $slug" >&2; exit 2 ;;
 esac
@@ -71,11 +73,26 @@ export COZY_ADMIN_PASSPHRASE="$(cat "$HOME/.cozy/admin-passphrase.txt")"
 # Optionally switch branch (refuses if the working tree is dirty, like git
 # itself does). On exit, return to whatever branch we started on so we
 # don't surprise the operator.
+#
+# Special case: if the requested branch is already checked out in another
+# linked worktree (`git worktree add`), `git checkout` here would fail
+# with "already used by worktree at …". Use that worktree as the source
+# instead, no checkout needed.
 if [ -n "$branch" ]; then
-  start_branch="$(git -C "$repo_root" rev-parse --abbrev-ref HEAD)"
-  trap 'git -C "$repo_root" checkout "$start_branch" >/dev/null 2>&1 || true' EXIT
-  echo "== Checking out $branch (from $start_branch)"
-  git -C "$repo_root" checkout "$branch"
+  alt_worktree="$(git -C "$repo_root" worktree list --porcelain 2>/dev/null \
+    | awk -v b="refs/heads/$branch" '
+        /^worktree / {wt=$2; next}
+        $0=="branch "b {print wt; exit}
+      ')"
+  if [ -n "$alt_worktree" ] && [ "$alt_worktree" != "$repo_root" ]; then
+    echo "== $branch is checked out at $alt_worktree (worktree) — using it as source"
+    repo_root="$alt_worktree"
+  else
+    start_branch="$(git -C "$repo_root" rev-parse --abbrev-ref HEAD)"
+    trap 'git -C "$repo_root" checkout "$start_branch" >/dev/null 2>&1 || true' EXIT
+    echo "== Checking out $branch (from $start_branch)"
+    git -C "$repo_root" checkout "$branch"
+  fi
 fi
 
 src_dir="$repo_root/$src_rel"
