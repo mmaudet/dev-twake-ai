@@ -4,6 +4,9 @@ import { Q, useQuery, useClient } from 'cozy-client'
 import Icon from 'cozy-ui/transpiled/react/Icon'
 import Spinner from 'cozy-ui/transpiled/react/Spinner'
 
+import excalidrawIcon from 'src/assets/icon-excalidraw.svg'
+import gristIcon from 'src/assets/icon-grist.png'
+
 // Only sort on updated_at — the (type, updated_at) composite index doesn't
 // exist by default and creating it for a sandbox isn't worth it. Filter
 // client-side for files (and skip notes which have their own widget).
@@ -88,7 +91,7 @@ const RecentFiles = () => {
             onClick={() => openFile(client, cozyUrl, file)}
           >
             <span className={`dashboard-list-icon ${isShortcut ? 'icon-shortcut' : 'icon-file'}`}>
-              <Icon icon={isShortcut ? 'link' : 'file-type-cloud'} size={18} />
+              <FileTypeIcon file={file} isShortcut={isShortcut} />
             </span>
             <div className="dashboard-list-text">
               <div className="dashboard-list-primary">{file.name}</div>
@@ -99,6 +102,20 @@ const RecentFiles = () => {
       })}
     </ul>
   )
+}
+
+// Pick a file-type icon: Excalidraw for *.excalidraw files, the Grist petal
+// for shortcuts that point to a Grist doc, and the cozy-ui defaults
+// otherwise (chain link for generic shortcuts, cloud for regular files).
+const FileTypeIcon = ({ file, isShortcut }) => {
+  if (file.name && file.name.toLowerCase().endsWith('.excalidraw')) {
+    return <img src={excalidrawIcon} alt="Excalidraw" width={20} height={20} style={{ borderRadius: 3, display: 'block' }} />
+  }
+  const target = file.metadata && file.metadata.target
+  if (isShortcut && target && target.app === 'grist') {
+    return <img src={gristIcon} alt="Grist" width={20} height={20} style={{ borderRadius: 3, display: 'block' }} />
+  }
+  return <Icon icon={isShortcut ? 'link' : 'file-type-cloud'} size={18} />
 }
 
 export default RecentFiles
