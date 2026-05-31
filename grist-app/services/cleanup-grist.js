@@ -98,13 +98,39 @@ function deleteGristDoc(docId) {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve({ statusCode: res.statusCode, body });
         } else {
-          reject(new Error('DELETE ' + docId + ' → ' + res.statusCode + ' ' + body));
+          const err = new Error('DELETE ' + docId + ' → ' + res.statusCode + ' ' + body);
+          err.statusCode = res.statusCode;
+          reject(err);
         }
       });
     });
     req.on('error', reject);
     req.end();
   });
+}
+
+// A 4xx other than 408/429 is a permanent client error — no point retrying.
+function isRetriable(err) {
+  if (!err.statusCode) return true; // network / DNS / TLS — try again
+  if (err.statusCode === 408 || err.statusCode === 429) return true;
+  if (err.statusCode >= 500) return true;
+  return false;
+}
+
+async function deleteGristDocWithRetry(docId) {
+  const delaysMs = [1000, 3000, 10000];
+  let lastError;
+  for (let attempt = 0; attempt < delaysMs.length + 1; attempt++) {
+    try {
+      return await deleteGristDoc(docId);
+    } catch (e) {
+      lastError = e;
+      log('attempt', attempt + 1, 'failed:', e.message);
+      if (!isRetriable(e) || attempt === delaysMs.length) break;
+      await new Promise(r => setTimeout(r, delaysMs[attempt]));
+    }
+  }
+  throw lastError;
 }
 
 (async () => {
@@ -119,10 +145,10 @@ function deleteGristDoc(docId) {
     return;
   }
   try {
-    const r = await deleteGristDoc(docId);
+    const r = await deleteGristDocWithRetry(docId);
     log('Grist doc', docId, 'deleted (' + r.statusCode + ')');
   } catch (e) {
-    log('failed to delete Grist doc', docId + ':', e.message);
+    log('failed to delete Grist doc', docId, 'after retries:', e.message);
     process.exit(1);
   }
 })();
