@@ -15,6 +15,23 @@ import '@excalidraw/excalidraw/index.css'
 
 const EXTENSION = '.excalidraw'
 
+// Debug log gate: enabled if window.__excalidrawEditor.debug is truthy
+// (set from index.html via ?debug=1 or via the manifest). Off in prod
+// to keep the browser console clean for end users.
+const dbg = (...args) => {
+  if (window.__excalidrawEditor && window.__excalidrawEditor.debug) {
+    // eslint-disable-next-line no-console
+    console.log(...args)
+  }
+}
+// Non-fatal warnings: only surfaced behind the same debug gate.
+const warn = (...args) => {
+  if (window.__excalidrawEditor && window.__excalidrawEditor.debug) {
+    // eslint-disable-next-line no-console
+    console.warn(...args)
+  }
+}
+
 const EMPTY_SCENE = {
   type: 'excalidraw',
   version: 2,
@@ -39,10 +56,16 @@ function stripExt(name) {
     : name
 }
 
-// Cozy's VFS rejects slashes and a few other chars in file names. Replace
-// them defensively so a title with `/` doesn't surface as a 4xx.
+// Cozy's VFS rejects slashes and a few other chars in file names. Strip
+// path separators, ASCII control chars (\x00-\x1f, plus DEL) — defensive
+// against pasted weird input or Unicode-confusable smuggling — and cap at
+// 200 chars to stay below filesystem limits.
 function sanitizeName(name) {
-  return (name || '').trim().replace(/[\\/]+/g, '-').slice(0, 200)
+  return (name || '')
+    .replace(/[\x00-\x1f\x7f]/g, '')
+    .trim()
+    .replace(/[\\/]+/g, '-')
+    .slice(0, 200)
 }
 
 async function fetchFileMeta({ cozyDomain, cozyToken, fileId }) {
@@ -93,7 +116,7 @@ async function fetchFileContent({ cozyDomain, cozyToken, fileId }) {
   try {
     return JSON.parse(text)
   } catch (e) {
-    console.warn('[excalidraw] file content unparseable, starting blank', e)
+    warn('[excalidraw] file content unparseable, starting blank', e)
     return EMPTY_SCENE
   }
 }
@@ -361,7 +384,7 @@ function App() {
         // mounts without waiting.
         fetchParentPath(ctx, meta.attributes.dir_id)
           .then(setPath)
-          .catch(e => console.warn('[excalidraw] path lookup failed', e))
+          .catch(e => warn('[excalidraw] path lookup failed', e))
         const appState = { ...(scene.appState || {}), collaborators: new Map() }
         appState.name = driveTitle
         // Re-stringify with the synced name so the very first save (if
@@ -389,7 +412,7 @@ function App() {
       const got = await renameFile(ctx, want)
       currentDriveName.current = got
     } catch (e) {
-      console.warn('[excalidraw] file rename failed', e.message || e)
+      warn('[excalidraw] file rename failed', e.message || e)
     }
   }
 
@@ -407,7 +430,7 @@ function App() {
         // appState.name in some builds) but we still want to PATCH.
         await pushNameIfChanged(appState)
       } catch (e) {
-        console.warn('[excalidraw] save failed', e)
+        warn('[excalidraw] save failed', e)
       }
     }, 800)
   }, [])
@@ -490,7 +513,7 @@ function App() {
       const got = await renameFile(ctx, next + EXTENSION)
       currentDriveName.current = got
     } catch (e) {
-      console.warn('[excalidraw] rename failed', e.message || e)
+      warn('[excalidraw] rename failed', e.message || e)
       // Roll back the title field if the rename was rejected.
       setTitle(stripExt(currentDriveName.current))
     }

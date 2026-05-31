@@ -133,7 +133,9 @@
       editorRoot.id = 'excalidraw-root';
       root.appendChild(editorRoot);
       // The bundled editor (editor.js) picks up these values from the global.
-      window.__excalidrawEditor = { cozyDomain, cozyToken, fileId };
+      // `debug` gates the editor's console output; enable with ?debug=1.
+      const debug = new URLSearchParams(location.search).get('debug') === '1';
+      window.__excalidrawEditor = { cozyDomain, cozyToken, fileId, debug };
       const s = document.createElement('script');
       s.src = 'editor.js';
       document.body.appendChild(s);
