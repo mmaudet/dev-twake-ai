@@ -46,6 +46,14 @@ SLUG="$1"
 PUBLIC_NAME="$2"
 EMAIL="$3"
 
+# slug must be a DNS-safe label (starts with a letter, then [a-z0-9-], up to
+# 31 chars total) — it becomes a subdomain AND the Authelia username, so any
+# weird character downstream is a footgun.
+if ! [[ "$SLUG" =~ ^[a-z][a-z0-9-]{1,30}$ ]]; then
+  echo "FAIL: slug '$SLUG' is not a valid DNS label (^[a-z][a-z0-9-]{1,30}$)" >&2
+  exit 2
+fi
+
 DOMAIN="${SLUG}.dev-twake.maudet.cloud"
 APP_SRC="file://$(cd "$(dirname "$0")/../twake-space-app" && pwd)"
 APPS="home,store,drive,photos,settings,contacts,notes,passwords,dataproxy"
@@ -108,6 +116,18 @@ fi
 # 2. Cozy instance + back-up passphrase
 #─────────────────────────────────────────────────────────────────────
 echo
+# Idempotence: if the Cozy instance already exists, `instances add` will fail
+# loudly and the script crashes mid-provision (Authelia user created but no
+# Cozy passphrase URL produced). Detect up-front and exit 0 instead.
+if cozy-stack instances show "$DOMAIN" >/dev/null 2>&1; then
+  echo "== Cozy instance $DOMAIN already exists — nothing to do"
+  if [ -n "$AUTHELIA_PASS" ]; then
+    echo "   Authelia user was just (re)created though:"
+    echo "     Authelia user : $SLUG"
+    echo "     Authelia pass : $AUTHELIA_PASS"
+  fi
+  exit 0
+fi
 echo "== Creating Cozy instance $DOMAIN"
 cozy-stack instances add "$DOMAIN" \
   --apps "$APPS" \

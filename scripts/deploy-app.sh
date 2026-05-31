@@ -9,13 +9,14 @@
 # every instance returned by `cozy-stack instances ls`.
 #
 # Usage:
-#   scripts/deploy-app.sh <slug> [--branch <branch>] [--build]
+#   scripts/deploy-app.sh <slug> [--branch <branch>] [--build] [--dry-run]
 #
 # Examples:
 #   scripts/deploy-app.sh excalidraw                   # sync from current worktree
 #   scripts/deploy-app.sh grist --branch feature/grist # sync from a specific branch
 #   scripts/deploy-app.sh drive --branch feature/twake-drive-fork --build
 #                                                      # twake-drive needs yarn build first
+#   scripts/deploy-app.sh grist --dry-run              # show what would happen, change nothing
 #
 # Known slugs (slug → source dir → stable dir):
 #   twakespace   twake-space-app/  ~/cozy-apps/twake-space-app/
@@ -32,13 +33,20 @@ slug="${1:-}"
 shift || true
 branch=""
 do_build=false
+dry_run=false
 while [ $# -gt 0 ]; do
   case "$1" in
     --branch) branch="$2"; shift 2 ;;
     --build) do_build=true; shift ;;
+    --dry-run) dry_run=true; shift ;;
     *) echo "Unknown flag: $1" >&2; exit 2 ;;
   esac
 done
+
+# Marker prepended to every line that would normally execute a side effect.
+# The functions below honor it: rsync gets --dry-run, cozy-stack calls are
+# printed instead of executed.
+DRY="$( [ "$dry_run" = true ] && printf '[DRY] ' || true )"
 
 if [ -z "$slug" ]; then
   sed -n '2,/^$/p' "$0" >&2
@@ -79,20 +87,26 @@ fi
 if [ "$do_build" = true ]; then
   # Drive needs a yarn build before we can sync.
   build_dir="$(dirname "$src_dir")"
-  echo "== yarn build in $build_dir"
-  ( cd "$build_dir" && yarn build )
+  echo "== ${DRY}yarn build in $build_dir"
+  if [ "$dry_run" = false ]; then
+    ( cd "$build_dir" && yarn build )
+  fi
 fi
 
-echo "== Syncing $src_dir → $dst_dir"
-mkdir -p "$dst_dir"
-rsync -a --delete "$src_dir/" "$dst_dir/"
+echo "== ${DRY}Syncing $src_dir → $dst_dir"
+if [ "$dry_run" = true ]; then
+  rsync -an --delete --itemize-changes "$src_dir/" "$dst_dir/" 2>&1 | head -50
+else
+  mkdir -p "$dst_dir"
+  rsync -a --delete "$src_dir/" "$dst_dir/"
+fi
 
 # Cache-bust the static asset references in index.html so browsers
 # don't keep serving an outdated bar.js / editor.js after a deploy.
 # (cozy-stack already adds hashed filenames to the built Drive bundle,
 # so this only matters for our home-grown coquilles which ship
 # unhashed files like editor.js + bar.js. We append ?v=<8-char md5>.)
-if [ -f "$dst_dir/index.html" ]; then
+if [ "$dry_run" = false ] && [ -f "$dst_dir/index.html" ]; then
   echo "== Adding cache-busters to index.html"
   for asset in bar.js bar.css editor.js editor.css; do
     [ -f "$dst_dir/$asset" ] || continue
@@ -104,17 +118,28 @@ if [ -f "$dst_dir/index.html" ]; then
   done
 fi
 
-echo "== Updating $slug on every instance"
+echo "== ${DRY}Updating $slug on every instance"
 mapfile -t instances < <(cozy-stack instances ls 2>/dev/null | awk '{print $1}')
 if [ "${#instances[@]}" -eq 0 ]; then
   echo "FAIL: no instances returned by cozy-stack instances ls" >&2
   exit 1
 fi
 target_src="file://$dst_dir"
+fail_count=0
 for inst in "${instances[@]}"; do
   printf '  - %-50s ' "$inst"
   current_src=$(cozy-stack apps ls --domain "$inst" 2>/dev/null \
                 | awk -v s="$slug" '$1==s {print $2}')
+  if [ "$dry_run" = true ]; then
+    if [ -z "$current_src" ]; then
+      echo "would: install $slug $target_src"
+    elif [ "$current_src" = "$target_src" ]; then
+      echo "would: update $slug (same source)"
+    else
+      echo "would: uninstall+install $slug (was $current_src)"
+    fi
+    continue
+  fi
   if [ -z "$current_src" ]; then
     cozy-stack apps install "$slug" "$target_src" --domain "$inst" 2>&1 | tail -1
   elif [ "$current_src" = "$target_src" ]; then
@@ -127,6 +152,22 @@ for inst in "${instances[@]}"; do
     cozy-stack apps uninstall "$slug" --domain "$inst" >/dev/null 2>&1
     cozy-stack apps install "$slug" "$target_src" --domain "$inst" 2>&1 | tail -1
   fi
+  # Healthcheck: cozy-stack apps show must succeed AND report our target_src.
+  # An install/update that "succeeded" but left the app in a broken state
+  # (e.g. manifest parse error) is caught here.
+  current_after=$(cozy-stack apps show "$slug" --domain "$inst" 2>/dev/null \
+                  | awk '/^Source/ {print $2}')
+  if [ "$current_after" = "$target_src" ]; then
+    printf '    ✓ healthcheck OK\n'
+  else
+    printf '    ✗ healthcheck FAIL (Source=%s, expected=%s)\n' \
+           "${current_after:-<none>}" "$target_src" >&2
+    fail_count=$((fail_count + 1))
+  fi
 done
 
-echo "== Done. $slug deployed from $dst_dir to ${#instances[@]} instance(s)."
+if [ "$fail_count" -gt 0 ]; then
+  echo "== FAIL: $fail_count/${#instances[@]} instance(s) failed healthcheck" >&2
+  exit 1
+fi
+echo "== ${DRY}Done. $slug deployed from $dst_dir to ${#instances[@]} instance(s)."
