@@ -48,9 +48,9 @@
       "verbs": ["GET"]
     },
     "files": {
-      "description": "Required to materialize Grist shortcuts in the Drive and keep their name in sync with the Grist doc title.",
+      "description": "Required to materialize Grist shortcuts in the Drive, keep their name in sync with the Grist doc title, and remove orphan shortcuts whose Grist doc no longer exists.",
       "type": "io.cozy.files",
-      "verbs": ["GET", "POST", "PATCH"]
+      "verbs": ["GET", "POST", "PATCH", "DELETE"]
     }
   },
   "routes": {
