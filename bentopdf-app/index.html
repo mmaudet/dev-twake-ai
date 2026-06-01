@@ -70,78 +70,137 @@
       background: #fff;
       color: #1a1d29;
       width: 100%;
-      max-width: 640px;
+      max-width: 720px;
       max-height: 80vh;
       display: flex;
       flex-direction: column;
       border-radius: 10px;
       box-shadow: 0 12px 32px rgba(0,0,0,0.35);
-      font-family: system-ui, sans-serif;
+      font-family: 'Lato', system-ui, -apple-system, sans-serif;
       overflow: hidden;
     }
-    .drive-picker-header {
+    .drive-picker-titlebar {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 1em 1.25em;
+      padding: 0.85em 1.25em;
       border-bottom: 1px solid #e5e7eb;
     }
-    .drive-picker-header h2 { margin: 0; font-size: 1.05rem; }
+    .drive-picker-titlebar h2 {
+      margin: 0;
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #32363f;
+    }
     .drive-picker-close {
       background: none; border: 0; cursor: pointer;
-      font-size: 1.2rem; padding: 0 .5em; color: #4b5563;
+      font-size: 1.2rem; padding: 0 .5em; color: #95999d;
+      line-height: 1;
+    }
+    .drive-picker-close:hover { color: #32363f; }
+    .drive-picker-breadcrumb {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.15em;
+      padding: 0.6em 1.25em;
+      border-bottom: 1px solid #f1f2f4;
+      font-size: 0.875rem;
+      color: #6c707a;
+      background: #fafafb;
+    }
+    .drive-picker-crumb {
+      background: none;
+      border: 0;
+      padding: 0.2em 0.4em;
+      margin: 0;
+      color: #297ef2;
+      cursor: pointer;
+      border-radius: 3px;
+      font: inherit;
+    }
+    .drive-picker-crumb:hover { background: #e8f1fe; }
+    .drive-picker-crumb[aria-current="page"] {
+      color: #32363f;
+      font-weight: 500;
+      cursor: default;
+    }
+    .drive-picker-crumb[aria-current="page"]:hover { background: none; }
+    .drive-picker-crumb-sep {
+      color: #c4c7cc;
+      user-select: none;
+      padding: 0 0.05em;
     }
     .drive-picker-body {
       overflow-y: auto;
       flex: 1 1 auto;
-      padding: 0.5em 0;
     }
     .drive-picker-status {
-      padding: 1.5em 1.25em;
-      color: #4b5563;
+      padding: 2em 1.25em;
+      color: #6c707a;
       text-align: center;
       font-size: 0.9rem;
     }
-    .drive-picker-list { list-style: none; margin: 0; padding: 0; }
+    .drive-picker-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
     .drive-picker-item {
       display: flex;
       align-items: center;
-      gap: 0.75em;
-      padding: 0.7em 1.25em;
-      border-bottom: 1px solid #f3f4f6;
+      gap: 0.85em;
+      padding: 0.65em 1.25em;
       cursor: pointer;
       transition: background 0.1s;
+      border-bottom: 1px solid #f1f2f4;
     }
     .drive-picker-item:hover,
     .drive-picker-item:focus {
-      background: #f3f4f6;
+      background: #f5f6f7;
       outline: none;
     }
-    .drive-picker-item .pdf-glyph {
+    .drive-picker-item.is-disabled {
+      cursor: not-allowed;
+      opacity: 0.45;
+    }
+    .drive-picker-item.is-disabled:hover { background: none; }
+    .drive-picker-icon {
       width: 28px; height: 28px;
-      background: #fee2e2;
-      color: #b91c1c;
-      border-radius: 4px;
+      flex-shrink: 0;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      font-size: 0.7rem;
-      font-weight: 700;
-      flex-shrink: 0;
     }
-    .drive-picker-item .pdf-meta {
+    .drive-picker-icon.folder-glyph { color: #5e72e4; }
+    .drive-picker-icon.pdf-glyph {
+      background: #fde4e4;
+      color: #c0392b;
+      border-radius: 4px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .drive-picker-meta {
       flex: 1 1 auto;
       min-width: 0;
     }
-    .drive-picker-item .pdf-name {
+    .drive-picker-name {
       font-weight: 500;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      color: #32363f;
+      font-size: 0.95rem;
     }
-    .drive-picker-item .pdf-sub {
+    .drive-picker-sub {
       font-size: 0.8rem;
-      color: #6b7280;
+      color: #95999d;
+      margin-top: 0.1em;
+    }
+    .drive-picker-chevron {
+      color: #c4c7cc;
+      flex-shrink: 0;
     }
   </style>
 </head>
@@ -165,10 +224,11 @@
 
   <div id="drive-picker-modal" role="dialog" aria-modal="true" aria-labelledby="drive-picker-title">
     <div class="drive-picker-panel">
-      <div class="drive-picker-header">
+      <div class="drive-picker-titlebar">
         <h2 id="drive-picker-title">Choisir un PDF depuis le Drive</h2>
         <button type="button" class="drive-picker-close" aria-label="Fermer">✕</button>
       </div>
+      <nav class="drive-picker-breadcrumb" aria-label="Chemin"></nav>
       <div class="drive-picker-body">
         <div class="drive-picker-status">Chargement…</div>
       </div>
@@ -190,8 +250,14 @@
     const fab = document.getElementById('drive-picker-fab');
     const modal = document.getElementById('drive-picker-modal');
     const body = modal.querySelector('.drive-picker-body');
+    const breadcrumbEl = modal.querySelector('.drive-picker-breadcrumb');
     const closeBtn = modal.querySelector('.drive-picker-close');
     dbg('elements:', { root: !!root, iframe: !!iframe, fab: !!fab, modal: !!modal, body: !!body, closeBtn: !!closeBtn });
+
+    const ROOT_DIR_ID = 'io.cozy.files.root-dir';
+    // Stack of {id, name} from root → current dir, used to render the
+    // breadcrumb and walk back up.
+    let dirStack = [];
 
     const formatBytes = n => {
       if (!n && n !== 0) return '';
@@ -210,8 +276,9 @@
 
     function open() {
       modal.dataset.open = 'true';
-      body.innerHTML = '<div class="drive-picker-status">Chargement…</div>';
-      fetchPdfs().then(render).catch(showError);
+      // Start fresh at the Drive root every time we open the picker.
+      dirStack = [{ id: ROOT_DIR_ID, name: 'Drive' }];
+      navigate(ROOT_DIR_ID);
     }
     function close() { modal.dataset.open = 'false'; }
 
@@ -222,78 +289,159 @@
       if (e.key === 'Escape' && modal.dataset.open === 'true') close();
     });
 
-    async function fetchPdfs() {
-      // Mango _find on io.cozy.files. No index on `mime` exists by default,
-      // so we ask for files updated recently and let the server filter by
-      // mime. With `use_index` omitted, cozy-stack falls back to
-      // _all_docs, which is fine for our scale (a few thousand files).
-      const res = await fetch('https://' + cozyDomain + '/files/_find', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Authorization': 'Bearer ' + cozyToken,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-          selector: {
-            type: 'file',
-            mime: 'application/pdf',
-            trashed: false
-          },
-          sort: [{ updated_at: 'desc' }],
-          limit: 50
-        })
-      });
-      if (!res.ok) {
-        throw new Error('HTTP ' + res.status + ' on /files/_find');
-      }
-      const json = await res.json();
-      return (json && (json.data || json.docs)) || [];
+    // Folder + PDF icons borrowed from the Cozy Drive look (Lato-ish
+    // simple line / labeled tile). Inline SVG keeps the coquille self-
+    // contained.
+    const FOLDER_SVG = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg>';
+    const CHEVRON_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>';
+
+    function setStatus(msg) {
+      body.innerHTML = '';
+      const d = document.createElement('div');
+      d.className = 'drive-picker-status';
+      d.textContent = msg;
+      body.appendChild(d);
     }
 
-    function render(docs) {
-      if (!docs.length) {
-        body.innerHTML = '<div class="drive-picker-status">'
-          + 'Aucun PDF dans ton Drive.'
-          + '</div>';
+    function renderBreadcrumb() {
+      breadcrumbEl.innerHTML = '';
+      dirStack.forEach((dir, idx) => {
+        if (idx > 0) {
+          const sep = document.createElement('span');
+          sep.className = 'drive-picker-crumb-sep';
+          sep.textContent = '›';
+          breadcrumbEl.appendChild(sep);
+        }
+        const btn = document.createElement('button');
+        btn.className = 'drive-picker-crumb';
+        btn.type = 'button';
+        btn.textContent = dir.name;
+        const isLast = idx === dirStack.length - 1;
+        if (isLast) {
+          btn.setAttribute('aria-current', 'page');
+        } else {
+          btn.addEventListener('click', () => {
+            // Truncate the stack and re-navigate to that level.
+            dirStack = dirStack.slice(0, idx + 1);
+            navigate(dir.id);
+          });
+        }
+        breadcrumbEl.appendChild(btn);
+      });
+    }
+
+    async function fetchDir(dirId) {
+      // `?include=contents` returns the folder doc + a sibling `included`
+      // array with the full doc of every direct child (folder or file).
+      const res = await fetch(
+        'https://' + cozyDomain + '/files/' + encodeURIComponent(dirId) + '?include=contents',
+        {
+          credentials: 'include',
+          headers: {
+            'Authorization': 'Bearer ' + cozyToken,
+            'Accept': 'application/vnd.api+json'
+          }
+        }
+      );
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const json = await res.json();
+      return json.included || [];
+    }
+
+    async function navigate(dirId) {
+      renderBreadcrumb();
+      setStatus('Chargement…');
+      let children;
+      try {
+        children = await fetchDir(dirId);
+      } catch (e) {
+        dbg('fetchDir failed', e);
+        setStatus('Impossible de lister le dossier : ' + (e.message || e));
+        return;
+      }
+      // Split folders vs PDFs, drop everything else (notes, images, …).
+      const folders = [];
+      const pdfs = [];
+      for (const c of children) {
+        const a = c.attributes || c;
+        if (a.trashed) continue;
+        if (a.type === 'directory') folders.push(c);
+        else if (a.type === 'file' && a.mime === 'application/pdf') pdfs.push(c);
+      }
+      // Folders first, then PDFs; alpha sort inside each group.
+      const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
+      folders.sort((x, y) => collator.compare(
+        (x.attributes && x.attributes.name) || '',
+        (y.attributes && y.attributes.name) || ''
+      ));
+      pdfs.sort((x, y) => collator.compare(
+        (x.attributes && x.attributes.name) || '',
+        (y.attributes && y.attributes.name) || ''
+      ));
+      render([...folders, ...pdfs]);
+    }
+
+    function render(items) {
+      if (!items.length) {
+        setStatus('Ce dossier ne contient aucun PDF ni sous-dossier.');
         return;
       }
       const ul = document.createElement('ul');
       ul.className = 'drive-picker-list';
-      for (const d of docs) {
-        const a = d.attributes || d;
+      for (const item of items) {
+        const a = item.attributes || item;
+        const id = item.id || item._id;
+        const isFolder = a.type === 'directory';
+
         const li = document.createElement('li');
         li.className = 'drive-picker-item';
         li.setAttribute('tabindex', '0');
         li.setAttribute('role', 'button');
-        li.innerHTML = ''
-          + '<span class="pdf-glyph">PDF</span>'
-          + '<div class="pdf-meta">'
-          +   '<div class="pdf-name"></div>'
-          +   '<div class="pdf-sub"></div>'
-          + '</div>';
-        li.querySelector('.pdf-name').textContent = a.name || '(sans nom)';
-        const size = formatBytes(parseInt(a.size, 10));
-        const date = formatDate(a.updated_at || a.created_at);
-        li.querySelector('.pdf-sub').textContent = [size, date].filter(Boolean).join(' · ');
-        const fileId = d.id || d._id;
-        li.addEventListener('click', () => pickPdf(fileId, a.name));
+
+        const icon = document.createElement('span');
+        icon.className = 'drive-picker-icon ' + (isFolder ? 'folder-glyph' : 'pdf-glyph');
+        icon.innerHTML = isFolder ? FOLDER_SVG : 'PDF';
+        li.appendChild(icon);
+
+        const meta = document.createElement('div');
+        meta.className = 'drive-picker-meta';
+        const nameEl = document.createElement('div');
+        nameEl.className = 'drive-picker-name';
+        nameEl.textContent = a.name || '(sans nom)';
+        meta.appendChild(nameEl);
+        if (!isFolder) {
+          const sub = document.createElement('div');
+          sub.className = 'drive-picker-sub';
+          const size = formatBytes(parseInt(a.size, 10));
+          const date = formatDate(a.updated_at || a.created_at);
+          sub.textContent = [size, date].filter(Boolean).join(' · ');
+          meta.appendChild(sub);
+        }
+        li.appendChild(meta);
+
+        if (isFolder) {
+          const chev = document.createElement('span');
+          chev.className = 'drive-picker-chevron';
+          chev.innerHTML = CHEVRON_SVG;
+          li.appendChild(chev);
+        }
+
+        const activate = () => {
+          if (isFolder) {
+            dirStack.push({ id: id, name: a.name || 'Dossier' });
+            navigate(id);
+          } else {
+            pickPdf(id, a.name);
+          }
+        };
+        li.addEventListener('click', activate);
         li.addEventListener('keydown', e => {
-          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pickPdf(fileId, a.name); }
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activate(); }
         });
         ul.appendChild(li);
       }
       body.innerHTML = '';
       body.appendChild(ul);
-    }
-
-    function showError(err) {
-      dbg('fetch error', err);
-      body.innerHTML = '<div class="drive-picker-status">'
-        + 'Impossible de lister les PDFs : '
-        + (err.message || String(err))
-        + '</div>';
     }
 
     async function pickPdf(fileId, name) {
