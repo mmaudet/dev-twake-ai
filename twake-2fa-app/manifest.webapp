@@ -1,5 +1,5 @@
 {
-  "name": "2FA LINAGORA",
+  "name": "My 2FA Setup",
   "name_prefix": "",
   "slug": "twake2fa",
   "icon": "icon.png",
@@ -15,12 +15,12 @@
   },
   "locales": {
     "fr": {
-      "name": "2FA LINAGORA",
+      "name": "My 2FA Setup",
       "short_description": "Configurer la double authentification LINAGORA",
       "long_description": "Raccourci vers la page d'enrôlement TOTP du SSO LINAGORA pour activer la double authentification sur ton compte."
     },
     "en": {
-      "name": "2FA LINAGORA",
+      "name": "My 2FA Setup",
       "short_description": "Set up LINAGORA two-factor authentication",
       "long_description": "Shortcut to the LINAGORA SSO TOTP enrolment page so you can enable 2FA on your account."
     }
