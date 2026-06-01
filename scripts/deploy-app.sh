@@ -25,6 +25,7 @@
 #   kanbn        kanbn-app/        ~/cozy-apps/kanbn-app/
 #   openproject  openproject-app/  ~/cozy-apps/openproject-app/
 #   n8n          n8n-app/          ~/cozy-apps/n8n-app/
+#   twake2fa     twake-2fa-app/    ~/cozy-apps/twake-2fa-app/
 #   dashboard    dashboard-app/build ~/cozy-apps/dashboard/       (--build runs `yarn build`)
 #   drive        twake-drive/build ~/cozy-apps/drive/             (--build runs `yarn build`)
 
@@ -61,6 +62,7 @@ case "$slug" in
   kanbn)       src_rel="kanbn-app"        ; dst_dir="$HOME/cozy-apps/kanbn-app"        ;;
   openproject) src_rel="openproject-app"  ; dst_dir="$HOME/cozy-apps/openproject-app"  ;;
   n8n)         src_rel="n8n-app"          ; dst_dir="$HOME/cozy-apps/n8n-app"          ;;
+  twake2fa)    src_rel="twake-2fa-app"    ; dst_dir="$HOME/cozy-apps/twake-2fa-app"    ;;
   dashboard)   src_rel="dashboard-app/build"; dst_dir="$HOME/cozy-apps/dashboard"      ;;
   drive)       src_rel="twake-drive/build"; dst_dir="$HOME/cozy-apps/drive"            ;;
   *) echo "Unknown slug: $slug" >&2; exit 2 ;;
