@@ -5,6 +5,12 @@ The base palette swap on :root + --color-* variables is not enough because
 parts of BentoPDF's bundle ship hex literals (#111827, #1e2939, #1f2937…)
 inside the CSS or as Vue/JS inline styles. We layer hard `!important`
 overrides on the Tailwind utility classes to win against them.
+
+This file also injects:
+- the "Démonstration — 17 outils sur 117" banner
+- a tiny JS listener for the parent coquille's postMessage so a PDF
+  picked from the Drive lands directly in BentoPDF's current file input
+  (no manual drag-drop required).
 """
 import re
 
@@ -12,20 +18,17 @@ p = '/etc/nginx/sites-available/bentopdf'
 s = open(p).read()
 
 # ------------------------------------------------------------------
-# Light theme palette (Tailwind-like, hex for portability against
-# inline-style values; CSS vars stay swapped too for any class that
-# resolves them).
+# Light theme palette
 # ------------------------------------------------------------------
-LIGHT_BG = '#ffffff'      # gray-900 ↔ pure white surface
-LIGHT_BG_2 = '#f8f9fa'    # body backdrop
-LIGHT_CARD = '#ffffff'    # gray-800 surface
+LIGHT_BG = '#ffffff'
+LIGHT_BG_2 = '#f8f9fa'
+LIGHT_CARD = '#ffffff'
 LIGHT_CARD_HOVER = '#f1f5f9'
-LIGHT_BORDER = '#e5e7eb'  # gray-700 border
-LIGHT_TEXT = '#1a1d29'    # dark navy (was text-white)
-LIGHT_TEXT_SOFT = '#475569'  # was text-gray-400
+LIGHT_BORDER = '#e5e7eb'
+LIGHT_TEXT = '#1a1d29'
+LIGHT_TEXT_SOFT = '#475569'
 
 light_css = (
-    # 1. :root variable swap (handles every class that resolves --color-gray-*)
     ":root{"
     "--color-gray-50:oklch(21% .034 264.665);"
     "--color-gray-100:oklch(27.8% .033 256.848);"
@@ -40,41 +43,30 @@ light_css = (
     "--color-white:" + LIGHT_TEXT + ";"
     "--color-black:#ffffff;"
     "}"
-    # 2. Body + html: defeat the hardcoded #111827 background-color.
     "html,body{background-color:" + LIGHT_BG_2 + " !important;color:" + LIGHT_TEXT + " !important;}"
-    # 3. Hardened class overrides (win over hex literals baked elsewhere)
     ".bg-gray-700,.bg-gray-750,.bg-gray-800,.bg-gray-850,.bg-gray-900{"
     "background-color:" + LIGHT_CARD + " !important;"
     "}"
     ".bg-black{background-color:" + LIGHT_BG + " !important;}"
     ".bg-white{background-color:" + LIGHT_TEXT + " !important;}"
-    # tool cards (JS-injected, often combine rounded-xl + border-gray-700)
     "[class*=rounded-xl][class*=border-gray-700]{"
     "background-color:" + LIGHT_CARD + " !important;"
     "border-color:" + LIGHT_BORDER + " !important;"
     "}"
     ".border-gray-600,.border-gray-700,.border-gray-800{border-color:" + LIGHT_BORDER + " !important;}"
-    # 4. Text overrides
     ".text-white{color:" + LIGHT_TEXT + " !important;}"
     ".text-gray-100,.text-gray-200,.text-gray-300{color:" + LIGHT_TEXT + " !important;}"
     ".text-gray-400,.text-gray-500{color:" + LIGHT_TEXT_SOFT + " !important;}"
-    # Section titles use text-indigo-200/300/400 which are too pale on light
-    # background. Darken them to indigo-700 (BentoPDF's primary accent).
     ".text-indigo-200,.text-indigo-300,.text-indigo-400{color:#4338ca !important;}"
-    # Tool category headers (Outils populaires, Éditer et annoter, …) are
-    # styled by a non-Tailwind rule .category-header{color:#fff;…} so the
-    # gray-* overrides above don't touch them; force the indigo-700 accent.
     ".category-header,.category-chevron{color:#4338ca !important;}"
     ".category-header:hover,.category-header:hover .category-chevron{color:#312e81 !important;}"
-    # 5. Common BentoPDF hex literals that show up as inline styles or
-    # tailwind arbitrary values like bg-[#111827].
     "[style*=\"#111827\"],[style*=\"#1e2939\"],[style*=\"#1f2937\"]{"
     "background-color:" + LIGHT_CARD + " !important;"
     "}"
 )
 
 # ------------------------------------------------------------------
-# Hide BentoPDF chrome (demo cleanup, same as before)
+# Hide chrome (demo cleanup)
 # ------------------------------------------------------------------
 hide_css = (
     "nav[data-simple-nav=\"true\"]{display:none !important}"
@@ -84,6 +76,47 @@ hide_css = (
 )
 
 style_block = "<style>" + light_css + hide_css + "</style>"
+
+# ------------------------------------------------------------------
+# Cozy <-> BentoPDF bridge: receive a Blob from the parent coquille
+# and feed it to the current tool's #file-input.
+#
+# Single-quoted string in nginx sub_filter so we keep it as one line
+# and avoid escaping inner double quotes. No literal single quotes
+# inside, hence the use of String.fromCharCode for the apostrophe.
+# ------------------------------------------------------------------
+bridge_js = (
+    "(function(){"
+    "var EXPECTED_PARENTS=[\"dev-twake.maudet.cloud\"];"
+    "function expectedOrigin(o){return EXPECTED_PARENTS.some(function(d){"
+    "return o===\"https://\"+d || o.endsWith(\".\"+d);"
+    "});}"
+    "function injectFile(file){"
+    "var input=document.getElementById(\"file-input\");"
+    "if(!input){"
+    "sessionStorage.setItem(\"cozyPendingPdf\",\"\");"
+    "alert(\"Choisis d\\u2019abord un outil PDF (Fusionner, Scinder, Compresser\\u2026) puis recommence.\");"
+    "return;"
+    "}"
+    "try{"
+    "var dt=new DataTransfer();"
+    "dt.items.add(file);"
+    "input.files=dt.files;"
+    "input.dispatchEvent(new Event(\"change\",{bubbles:true}));"
+    "}catch(err){console.error(\"[cozy-bridge] inject failed\",err);}"
+    "}"
+    "window.addEventListener(\"message\",function(e){"
+    "if(!expectedOrigin(e.origin))return;"
+    "var d=e.data||{};"
+    "if(d.type!==\"cozy-load-pdf\")return;"
+    "if(!d.blob)return;"
+    "var name=d.name||\"document.pdf\";"
+    "var file=new File([d.blob],name,{type:\"application/pdf\"});"
+    "injectFile(file);"
+    "});"
+    "})();"
+)
+bridge_script = "<script>" + bridge_js + "</script>"
 
 banner = (
     "<div id=\"cozy-demo-banner\" "
@@ -96,12 +129,12 @@ banner = (
     "</div>"
 )
 
-replacement = '<body class="antialiased">' + style_block + banner
+replacement = '<body class="antialiased">' + style_block + bridge_script + banner
 new_line = "        sub_filter '<body class=\"antialiased\">' '" + replacement + "';"
 
 s, n = re.subn(
     r"^[ \t]*sub_filter '<body class=\"antialiased\">' '[^']*';",
-    new_line,
+    lambda _m: new_line,  # bypass back-reference / \u interpretation
     s,
     count=1,
     flags=re.MULTILINE,
