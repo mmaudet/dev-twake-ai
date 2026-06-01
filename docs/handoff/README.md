@@ -12,8 +12,10 @@ Aucune branche n'est mergée — c'est intentionnel. Chaque feature vit sur sa p
 | `feature/dashboard` | App Cozy custom : dashboard drag-and-drop avec widgets (Drive, Notes, kan.bn, Mail Linagora, Calendar Linagora). Backend Node.js pour OIDC / JMAP / CalDAV. | [dashboard.md](dashboard.md) |
 | `feature/excalidraw` | Coquille Cozy `excalidraw` (éditeur sur fichiers `.excalidraw` du Drive) + base Drive forkée. **Branche depuis `feature/twake-drive-fork`**. | [excalidraw.md](excalidraw.md) |
 | `feature/grist` | Coquille Cozy `grist` + backend de cascade-delete + base Drive forkée. **Branche depuis `feature/twake-drive-fork`**. | [grist.md](grist.md) |
+| `feature/bentopdf` | Coquille Cozy `bentopdf` (« PDF Toolkit ») wrappant BentoPDF self-hosté. File picker Drive intégré dans la dropzone (2 cartes symétriques), file explorer avec breadcrumb, light theme + démo bandeau + sélection 17 outils via nginx sub_filter. | [bentopdf.md](bentopdf.md) |
+| `feature/twake-2fa-linagora` | Coquille Cozy `twake2fa` (« My 2FA Setup ») : page minimale avec CTA qui ouvre `sso.linagora.com/2fregisters/totp` dans un nouvel onglet pour l'enrôlement TOTP. | [twake-2fa.md](twake-2fa.md) |
 | `feature/twake-drive-fork` | Fork de `linagora/twake-drive @ d2e6bbc` avec 4 patches : entrée menu « + Créer → Excalidraw/Grist », dispatch `.excalidraw`, redirect external coquilles, hardening matching name. | [twake-drive-fork.md](twake-drive-fork.md) |
-| `feature/twake-space` | Wrapper Cozy `twakespace` (esbuild + cozy-bar autour de la démo Twake Space) + scripts de déploiement et de provisioning. | [twake-space.md](twake-space.md) |
+| `feature/twake-space` | Wrapper Cozy `twakespace` (esbuild + cozy-bar autour de la démo Twake Space) + scripts de déploiement et de provisioning + patches nginx hermes (hide dataproxy/store du launcher). | [twake-space.md](twake-space.md) |
 | `feature/kanbn` | Coquille Cozy `kanbn` (en surface seulement, hors scope handoff complet). | — |
 | `feature/n8n` | Coquille Cozy `n8n` (idem). | — |
 | `feature/openproject` | Coquille Cozy `openproject` (idem). | — |
@@ -26,6 +28,8 @@ Aucune branche n'est mergée — c'est intentionnel. Chaque feature vit sur sa p
 main (bootstrap + docs handoff)
 ├── feature/dashboard
 ├── feature/twake-space
+├── feature/twake-2fa-linagora
+├── feature/bentopdf
 ├── feature/twake-drive-fork           ← base Drive forkée (5 commits)
 │   ├── feature/excalidraw             ← branche depuis twake-drive-fork
 │   └── feature/grist                  ← branche depuis twake-drive-fork
@@ -34,13 +38,13 @@ main (bootstrap + docs handoff)
 └── feature/openproject
 ```
 
-`feature/excalidraw` et `feature/grist` héritent du Drive forké : pour les exécuter, il faut build le Drive depuis ces branches (les coquilles Cozy sont autonomes mais l'intégration « + Créer dans Drive » et le dispatch `.excalidraw` viennent du fork).
+`feature/excalidraw` et `feature/grist` héritent du Drive forké : pour les exécuter, il faut build le Drive depuis ces branches (les coquilles Cozy sont autonomes mais l'intégration « + Créer dans Drive » et le dispatch `.excalidraw` viennent du fork). Les coquilles `bentopdf` et `twake-2fa-linagora` sont indépendantes du fork Drive.
 
 ## Ordre de merge suggéré (si l'équipe décide d'intégrer)
 
-1. `feature/twake-space` (provisioning + scripts) — pré-requis pour déployer toute coquille.
+1. `feature/twake-space` (provisioning + scripts + patches hermes) — pré-requis pour déployer toute coquille.
 2. `feature/twake-drive-fork` (base Drive avec menu + dispatch) — pré-requis pour Excalidraw + Grist.
-3. `feature/dashboard` — indépendant.
+3. `feature/dashboard`, `feature/bentopdf`, `feature/twake-2fa-linagora` — indépendants, peuvent merger en parallèle.
 4. `feature/excalidraw` et `feature/grist` — peuvent merger en parallèle dès que (2) est en place.
 5. `feature/kanbn`, `feature/n8n`, `feature/openproject` — indépendants (hors scope handoff).
 
@@ -57,6 +61,8 @@ main (bootstrap + docs handoff)
 | Linagora CalDAV | API calendrier, utilisée par le widget Calendar du dashboard. | https://tcalendar.linagora.com |
 | Grist self-hosted | Backend Grist sur athena (OIDC-wired). | https://grist.dev-twake.maudet.cloud |
 | Excalidraw self-hosted | Backend Excalidraw sur athena (Authelia-gated). | https://excalidraw.dev-twake.maudet.cloud |
+| BentoPDF self-hosted | Toolkit PDF en Docker sur athena port 6130 (image `ghcr.io/alam00000/bentopdf-simple:latest`, Authelia-gated). | https://bentopdf.dev-twake.maudet.cloud |
+| LINAGORA 2FA TOTP | Page d'enrôlement TOTP du SSO LINAGORA (ouvrir dans un nouvel onglet depuis la coquille `twake2fa`). | https://sso.linagora.com/2fregisters/totp |
 
 ## Démarrage local
 

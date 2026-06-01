@@ -48,24 +48,33 @@ dashboard-backend/    ← backend Node.js (Express)
 | Élément | Fichier | Notes |
 |---------|---------|-------|
 | URL du backend dashboard | `dashboard-app/src/utils/backend.js:2` | Hardcodée `https://dashboard-api.dev-twake.maudet.cloud`. **À externaliser** (env build-time ou paramètre manifest). |
-| Tokens en sessionStorage | `dashboard-app/src/components/OidcCallback.jsx` | `linagora_pkce` (state + verifier). Cleanup au callback. Pas d'expiry explicite — vieux tokens si plusieurs essais. |
+| Tokens en sessionStorage avec TTL | `dashboard-app/src/components/OidcCallback.jsx` | `linagora_pkce` (state + verifier + `created_at`) — TTL 5 min appliqué au callback, ancien state cleared automatiquement. Commit `317725c77` `[audit]`. |
 | Credentials CORS | `dashboard-app/src/utils/backend.js` | `credentials: 'include'` sur tous les fetchs. Suppose CORS configuré côté backend pour `*.dev-twake.maudet.cloud`. |
-| Persistance des tokens | Backend Node, non auditée dans ce handoff (côté `dashboard-backend/`) | Vérifier : storage chiffré, rotation refresh tokens, scoping par cozyId. |
+| Refresh-token rejet | `dashboard-backend/tokens.js:refreshTokens` | Un 4xx OIDC (invalid_grant, …) → `clearTokens(widget)` + throw `NOT_CONNECTED` → 401 propre côté API. Avant : `Error` générique → 500 opaque. Commit `643a5daae` `[audit]`. |
+| Statut widgets `/api/status` | `dashboard-backend/server.js:statusFor` | `connected: false` si `isExpired(tokens)` ET pas de refresh_token utilisable. Avant : `true` dès qu'un access_token existe (même expiré). Commit `643a5daae`. |
+| Widget RecentFiles : URL des shortcuts Grist | `dashboard-app/src/components/widgets/RecentFiles.jsx` | Utilise `info.url` directement (déjà bien formé par la coquille grist depuis `338ab936b`). Commit `28f0a5684` `[audit]` — avant : reconstruction buggy `<slug>-grist.<domain>/o/<org>/<docId>` → 404. |
+| Widget RecentFiles : icônes file-type | `dashboard-app/src/components/widgets/RecentFiles.jsx:FileTypeIcon` | `.excalidraw` → icône Excalidraw, shortcut Grist → pétale Grist. Icônes vendored dans `dashboard-app/src/assets/`. Commit `369ac4531`. |
 
 ## Déploiement
 
-L'app n'est pas (encore) wired dans `scripts/deploy-app.sh`. Pour la déployer manuellement :
+Désormais wired dans `scripts/deploy-app.sh` (slug `dashboard`, source `dashboard-app/build`, nécessite `--build` pour `yarn build`) :
 
 ```
-cd dashboard-app && yarn build
-cozy-stack apps install dashboard file://$(pwd)/build --domain <slug>.dev-twake.maudet.cloud
+scripts/deploy-app.sh dashboard --branch feature/dashboard --build
 ```
 
-Le backend doit tourner indépendamment sur `dashboard-api.dev-twake.maudet.cloud` (déployé manuellement sur athena, derrière Hermes).
+Le `dashboard-backend/` tourne indépendamment sur athena (systemd user unit `dashboard-backend.service`, port 8090) et est exposé via Hermes à `https://dashboard-api.dev-twake.maudet.cloud`. **Pas géré par `deploy-app.sh`** (qui ne gère que les coquilles Cozy) — un changement de code backend nécessite un `systemctl --user restart dashboard-backend.service` après `git pull` du worktree.
 
 ## Commits notables (`main..feature/dashboard`)
 
-15 commits, tous propres et focalisés sur le dashboard. Du plus ancien au plus récent : initialisation drag-and-drop, ajout des widgets Mail/Calendar via backend, widget catalogue, fixes cozy-bar coexistence avec React, fixes OIDC callback path. Aucune contamination cross-feature.
+19 commits :
+
+- 15 sur le dashboard initial : drag-and-drop, widgets Mail/Calendar via backend, widget catalogue, fixes cozy-bar coexistence React, fixes OIDC callback path.
+- 4 fixes audit `[audit]` :
+  - `317725c77` — PKCE state TTL (5 min)
+  - `643a5daae` — refresh_token Linagora rejeté = NOT_CONNECTED au lieu de 500 (côté `dashboard-backend/`)
+  - `28f0a5684` — RecentFiles trust `info.url` au lieu de reconstruire (fix 404 sur shortcuts Grist)
+  - `369ac4531` — icônes file-type Excalidraw/Grist dans RecentFiles
 
 ## Points à confirmer avec l'équipe
 

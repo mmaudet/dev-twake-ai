@@ -22,6 +22,12 @@ twake-space-app-build/   ← projet esbuild qui produit bar.js + bar.css
 scripts/
   deploy-app.sh          ← rsync coquille → ~/cozy-apps/<slug>/ + cozy-stack apps install/update
   provision-user.sh      ← ajoute un user dans Authelia + crée Cozy instance + envoie welcome mail
+  hermes/
+    patch-dev-twake-nginx.py  ← injecte un sub_filter CSS dans le vhost
+                                hermes catch-all qui hide les apps
+                                « dataproxy » et « store » du launcher
+                                Cozy + de la home (purement cosmétique)
+    README.md             ← procédure de déploiement du patch hermes
 
 USERS.md                 ← registre des utilisateurs provisionnés (slug, name, email, date)
 ```
@@ -40,29 +46,55 @@ Architecture : la démo Twake Space est un export statique HTML/JSX (avec `@babe
 
 ## `scripts/deploy-app.sh`
 
-Sync une coquille du repo vers les instances Cozy. Usage : `./scripts/deploy-app.sh <slug>` (twakespace, dashboard, grist, excalidraw, etc.).
+Sync une coquille du repo vers les instances Cozy. Usage : `./scripts/deploy-app.sh <slug> [--branch <branch>] [--build] [--dry-run]`.
+
+Slugs câblés (case `$slug` du script) :
+
+| Slug | Source dans le repo | Branche typique |
+|------|---------------------|------------------|
+| `twakespace` | `twake-space-app/` | `feature/twake-space` |
+| `grist` | `grist-app/` | `feature/grist` |
+| `excalidraw` | `excalidraw-app/` | `feature/excalidraw` |
+| `kanbn` | `kanbn-app/` | `feature/kanbn` |
+| `openproject` | `openproject-app/` | `feature/openproject` |
+| `n8n` | `n8n-app/` | `feature/n8n` |
+| `twake2fa` | `twake-2fa-app/` | `feature/twake-2fa-linagora` |
+| `bentopdf` | `bentopdf-app/` | `feature/bentopdf` |
+| `dashboard` | `dashboard-app/build` | `feature/dashboard` (avec `--build`) |
+| `drive` | `twake-drive/build` | `feature/twake-drive-fork` (avec `--build`) |
 
 Flow :
-1. Optionnellement `git checkout` la branche source de la coquille (trap pour restaurer la branche initiale en sortie).
-2. Si la coquille a un build (`yarn build`), le lance.
-3. Rsync `<repo>/<slug>-app/` → `~/.cozy-apps/<slug>/`.
-4. Cache-bust : MD5 des fichiers non-hashed → ajout de `?v=<hash>` dans `index.html` pour forcer les browsers à refetch.
-5. Pour chaque instance dans `~/.cozy-apps/instances.txt` : `cozy-stack apps install` ou `update` selon état.
+1. **Worktree-aware checkout** (`--branch`) : si la branche cible est déjà checkée dans un worktree linké (`git worktree add`), le script utilise ce path comme source au lieu de tenter un `git checkout` (qui échouerait). Sinon, switch + trap pour restaurer la branche initiale en sortie.
+2. Si `--build` est passé, lance `yarn build` dans le dossier parent du `src_rel` (pour les coquilles qui ont une étape de build : `drive`, `dashboard`).
+3. Rsync `<source>/` → `~/cozy-apps/<slug>/` (mode `--delete`, ou `--dry-run --itemize-changes` si `--dry-run`).
+4. Cache-bust : MD5 des fichiers non-hashed (`bar.js`, `bar.css`, `editor.js`, `editor.css`) → ajout de `?v=<8-char-hash>` dans `index.html` pour forcer les browsers à refetch.
+5. Pour chaque instance retournée par `cozy-stack instances ls` : `cozy-stack apps install` (si absent), `update` (si même source), `uninstall + install` (si source différente).
+6. **Healthcheck par instance** : `cozy-stack apps show <slug> --domain <inst>` doit reporter `Source = <target_src>`. Sinon → `fail_count++`. Le script exit 1 si une instance a fail.
 
-### Points d'attention
+### Modes spéciaux
 
-- `--delete` sur rsync : destructif si la source est mauvaise. Pas de dry-run.
-- Pas de healthcheck post-déploiement.
-- `COZY_ADMIN_PASSPHRASE` lue de `~/.cozy/admin-passphrase.txt` (fichier en clair, doit être 600).
+- `--dry-run` : rsync passe en `-an --itemize-changes`, les commandes `cozy-stack apps` sont juste affichées en `would: install/update/…` sans exécution.
+- `--branch <name>` : utilise cette branche comme source. Worktree-aware.
+- `--build` : exécute `yarn build` avant le rsync (pour les coquilles avec étape de build).
+
+### Fixes audit appliqués (`feature/twake-space`)
+
+- **Medium** — `--dry-run` ajouté + healthcheck par instance + parsing JSON (au lieu de regex texte) pour `cozy-stack apps show` (commits `3ba399c99`, `c6a0cb972`).
+- Nouveau slug `dashboard` + détection worktree-aware (`947eec000`).
+- Nouveau slug `twake2fa` (`b4e0774bb`).
+- Nouveau slug `bentopdf` (`bc652c25a`).
 
 ## `scripts/provision-user.sh`
 
 Provisionne un user sur athena : Authelia + Cozy instance + welcome email. Usage : `./scripts/provision-user.sh <slug> <public_name> <email>`.
 
 Flow :
-1. **Authelia** : ssh hermes, append le user à `/opt/authelia/config/users_database.yml`. Mot de passe généré (20 chars random + `Xy!` suffix), hashé via `authelia crypto hash generate argon2` dans le container. Restart Authelia.
-2. **Cozy** : `cozy-stack instances add <slug>.dev-twake.maudet.cloud` avec les apps standard + `twakespace`. Trigger `/auth/passphrase_reset` (CSRF dance), lit le `passphrase_reset_token` directement dans CouchDB → produit un lien `/auth/passphrase_renew` à usage unique.
-3. **Email** : envoie un welcome mail (Linagora SMTP) avec les 2 jeux de credentials. BCC opérateur optionnel via `COZY_BCC_EMAIL`.
+1. **Validation slug** : regex `^[a-z][a-z0-9-]{1,30}$` (DNS-safe). Refuse up-front sinon.
+2. **Authelia** : ssh hermes, append le user à `/opt/authelia/config/users_database.yml`. Mot de passe généré (20 chars random + `Xy!` suffix), hashé via `authelia crypto hash generate argon2` dans le container. Restart Authelia.
+3. **Cozy idempotence** : si `cozy-stack instances show <slug>.dev-twake.maudet.cloud` succeed → l'instance existe déjà, exit 0 avec message. Sinon `cozy-stack instances add` avec les apps standard.
+4. **Install apps custom** : étape `cozy-stack apps install twakespace ...` puis `cozy-stack apps install bentopdf ...` (depuis `~/cozy-apps/bentopdf-app/` peuplé par `deploy-app.sh`). Les autres coquilles (dashboard, grist, excalidraw, kanbn, n8n, openproject, twake2fa, drive) sont déployées séparément via `deploy-app.sh` qui itère sur toutes les instances.
+5. Trigger `/auth/passphrase_reset` (CSRF dance), lit le `passphrase_reset_token` directement dans CouchDB → produit un lien `/auth/passphrase_renew` à usage unique.
+6. **Email** : envoie un welcome mail (Linagora SMTP) avec les 2 jeux de credentials. BCC opérateur optionnel via `COZY_BCC_EMAIL`.
 
 ### Prérequis sur athena
 
@@ -74,20 +106,38 @@ Flow :
 ssh hermes                      passwordless sudo pour Authelia
 ```
 
-### Fixes audit appliqués (commit `04332cf09`)
+### Fixes audit appliqués sur `provision-user.sh`
 
-- **Critical** — URL CouchDB extraite en `COZY_COUCHDB_URL` (avant : `http://admin:password@127.0.0.1:5984` en dur).
+- **Critical** — URL CouchDB extraite en `COZY_COUCHDB_URL` (commit `04332cf09`, avant : `http://admin:password@127.0.0.1:5984` en dur).
 - **High** — Password entropy passée de 14 à 20 chars random (suffix `Xy!` conservé pour la contrainte de complexité Authelia).
 - **High** — BCC opérateur extrait en `COZY_BCC_EMAIL` (avant : `michel.maudet@gmail.com` en dur, leaked à chaque provision).
+- **Medium** — Validation slug regex + check d'idempotence (`cozy-stack instances show` avant `add`) — commit `3ba399c99`.
+- **Feature** — Auto-install `bentopdf` pour les nouveaux users (commit `ca6efef81`).
+
+## `scripts/hermes/patch-dev-twake-nginx.py`
+
+Le launcher Cozy (cozy-bar) et la home triant les apps par `slug` (alphabétique, immuable), il n'y a pas de levier natif pour masquer ou réordonner certaines apps comme `dataproxy` ou `store`. Le script injecte un `<style>` via nginx `sub_filter` sur le vhost catch-all `dev-twake` (qui sert TOUTES les coquilles + la home Cozy) qui cache les tiles des 2 apps via plusieurs sélecteurs CSS (par `href`, `data-slug`, `aria-label`).
+
+Idempotent — re-run remplace le block existant en place via marqueurs `# >>> cozy-launcher-hide >>> … # <<< cozy-launcher-hide <<<`.
+
+Effet : **les apps `dataproxy` et `store` disparaissent visuellement du launcher et de la home** sur toutes les instances. Elles restent installées et reachable par leur URL directe (`<slug>-store.…`, `<slug>-dataproxy.…`).
+
+Voir `scripts/hermes/README.md` pour la procédure de déploiement et de revert.
 
 ## Commits notables (`main..feature/twake-space`)
 
-16 commits :
+23 commits :
 
 - 8 sur le wrapper `twakespace` (init, refresh demo.html successifs, fix icon viewBox, revert).
-- 4 sur le provisioning (`provision-user.sh` + flows passphrase, BCC).
+- 4 sur le provisioning initial (`provision-user.sh` + flows passphrase, BCC).
 - 3 sur les scripts (`deploy-app.sh` + cache-bust).
-- 1 fix audit (`04332cf09`) — extraction secrets + entropy.
+- 1 fix audit Critical/High (`04332cf09`) — extraction secrets + entropy.
+- 1 fix audit Medium (`3ba399c99`) — slug regex + idempotence + dry-run + healthcheck.
+- 1 fix audit Medium (`c6a0cb972`) — healthcheck parse JSON.
+- 4 ajouts de slugs à `deploy-app.sh` : dashboard, twake2fa, bentopdf + worktree-aware checkout.
+- 1 chore (`7e862f8e6`) — registre `USERS.md` augmenté de Paul Tranvan + Patrick Pereira.
+- 1 feature (`ca6efef81`) — install automatique `bentopdf` au provision.
+- 1 feature (`55fc1645d`) — patch nginx hermes pour hide dataproxy + store du launcher.
 
 ## Points à confirmer avec l'équipe
 
