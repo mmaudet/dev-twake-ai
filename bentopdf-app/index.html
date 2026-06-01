@@ -319,6 +319,16 @@
         // reliably structured-clonable and zero-copy.
         const arrayBuffer = await blob.arrayBuffer();
         dbg('arrayBuffer', { byteLength: arrayBuffer.byteLength });
+        // Diagnostic ping (tiny payload, target '*'): if this doesn't
+        // even reach the bridge, the issue is upstream of structured-
+        // clone (CSP, Service Worker swap, COEP, frame mismatch, …).
+        dbg('sending diagnostic ping (target *)');
+        try {
+          iframe.contentWindow.postMessage(
+            { type: 'cozy-ping', ts: Date.now() },
+            '*'
+          );
+        } catch (pingErr) { dbg('ping threw', pingErr); }
         dbg('posting cozy-load-pdf to', BENTOPDF_BASE, 'iframe.src =', iframe.src);
         iframe.contentWindow.postMessage({
           type: 'cozy-load-pdf',
