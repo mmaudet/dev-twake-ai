@@ -212,23 +212,22 @@
   <script src="bar.js" defer></script>
   <script>
   (function () {
-    // Logs always on while we debug the picker→iframe hand-off.
-    const dbg = (...a) => { console.log('[bentopdf-picker]', ...a); };
-    dbg('coquille script boot at', new Date().toISOString());
+    // Picker traces — opt-in via ?debug=1 on the coquille URL.
+    const DEBUG = new URLSearchParams(location.search).get('debug') === '1';
+    const dbg = (...a) => { if (DEBUG) console.log('[bentopdf-picker]', ...a); };
 
     const BENTOPDF_BASE = 'https://bentopdf.dev-twake.maudet.cloud';
     const root = document.querySelector('[role=application]');
     const cozyToken = root.dataset.cozyToken;
     const cozyDomain = root.dataset.cozyDomain;
     const iframe = document.getElementById('bentopdf-frame');
-    // The trigger to open the picker now lives *inside* BentoPDF —
-    // injected by the bridge script next to the local dropzone — and
-    // sends a `cozy-open-picker` postMessage to us. We just listen.
+    // The trigger to open the picker lives *inside* BentoPDF — injected
+    // by the bridge script as a Drive card next to the local dropzone —
+    // and sends a `cozy-open-picker` postMessage to us. We just listen.
     const modal = document.getElementById('drive-picker-modal');
     const body = modal.querySelector('.drive-picker-body');
     const breadcrumbEl = modal.querySelector('.drive-picker-breadcrumb');
     const closeBtn = modal.querySelector('.drive-picker-close');
-    dbg('elements:', { root: !!root, iframe: !!iframe, modal: !!modal, body: !!body, closeBtn: !!closeBtn });
 
     const ROOT_DIR_ID = 'io.cozy.files.root-dir';
     // Stack of {id, name} from root → current dir, used to render the
@@ -449,34 +448,12 @@
         // reliably structured-clonable and zero-copy.
         const arrayBuffer = await blob.arrayBuffer();
         dbg('arrayBuffer', { byteLength: arrayBuffer.byteLength });
-        // Re-query the iframe element + target window at click time —
-        // the cached `iframe` reference taken at boot can go stale if
-        // cozy-bar (or any other lib) re-renders the surrounding DOM.
-        const freshFrame = document.getElementById('bentopdf-frame');
-        const target = freshFrame && freshFrame.contentWindow;
-        dbg('iframe identity check', {
-          sameElement: freshFrame === iframe,
-          sameWindow: target === iframe.contentWindow,
-          hasTarget: !!target
-        });
-        if (!target) {
-          throw new Error('bentopdf-frame.contentWindow unavailable');
-        }
-        // Send 3 messages: a ping without transferable, a ping with
-        // an empty ArrayBuffer + transferable, then the real payload.
-        // If only the first one survives, transferable is the culprit
-        // and we can simply drop the transferable list.
-        dbg('ping (no transferable, target *)');
-        try { target.postMessage({ type: 'cozy-ping-1' }, '*'); }
-        catch (e1) { dbg('ping1 threw', e1); }
-        dbg('ping (with transferable, target *)');
-        try {
-          const small = new ArrayBuffer(8);
-          target.postMessage({ type: 'cozy-ping-2', buf: small }, '*', [small]);
-        } catch (e2) { dbg('ping2 threw', e2); }
-        dbg('posting cozy-load-pdf to *, no transferable (more compatible)');
-        // Drop the transferable list to use plain structured clone —
-        // safer cross-browser than relying on transfer semantics.
+        // Re-query the iframe at click time — a cached reference can go
+        // stale across re-renders. Send the payload via plain
+        // structured clone (no transferable list) for maximum
+        // cross-browser compatibility.
+        const target = document.getElementById('bentopdf-frame').contentWindow;
+        if (!target) throw new Error('bentopdf-frame.contentWindow unavailable');
         target.postMessage({
           type: 'cozy-load-pdf',
           name: name || 'document.pdf',

@@ -10,7 +10,13 @@
 //    from the parent coquille and feeds the resulting File into
 //    BentoPDF's #file-input (DataTransfer + change event).
 (function () {
-  console.log('[cozy-bridge] script loaded on', location.href);
+  // Verbose traces only when the iframe URL carries ?debug=1. The
+  // parent coquille can flip the iframe URL to enable this for a
+  // debug session.
+  var DEBUG = new URLSearchParams(location.search).get('debug') === '1';
+  function dbg() { if (DEBUG) console.log.apply(console, arguments); }
+
+  dbg('[cozy-bridge] script loaded on', location.href);
 
   // Block BentoPDF's own service worker — it intercepts every fetch
   // (including the HTML response) and triggers a reload on activation,
@@ -21,12 +27,10 @@
   try {
     if (navigator.serviceWorker) {
       navigator.serviceWorker.register = function () {
-        console.log('[cozy-bridge] blocked SW register call');
         return Promise.resolve(null);
       };
       navigator.serviceWorker.getRegistrations().then(function (rs) {
         if (rs && rs.length) {
-          console.log('[cozy-bridge] unregistering', rs.length, 'existing SW(s)');
           rs.forEach(function (r) { r.unregister(); });
         }
       });
@@ -34,15 +38,6 @@
   } catch (swErr) {
     console.warn('[cozy-bridge] SW disable failed', swErr);
   }
-
-  // Diagnostic catch-all: log every postMessage ever received.
-  window.addEventListener('message', function (e) {
-    console.log('[cozy-bridge:RAW] any message received', {
-      origin: e.origin,
-      dataType: typeof e.data,
-      data: e.data
-    });
-  }, true);
 
   var EXPECTED_PARENTS = ['dev-twake.maudet.cloud'];
   function expectedOrigin(o) {
@@ -53,7 +48,7 @@
 
   function injectFile(file) {
     var input = document.getElementById('file-input');
-    console.log('[cozy-bridge] looking for #file-input, found:', !!input);
+    dbg('[cozy-bridge] looking for #file-input, found:', !!input);
     if (!input) {
       alert('Choisis d’abord un outil PDF (Fusionner, Scinder, Compresser…) puis recommence.');
       return;
@@ -63,7 +58,7 @@
       dt.items.add(file);
       input.files = dt.files;
       input.dispatchEvent(new Event('change', { bubbles: true }));
-      console.log('[cozy-bridge] file injected:', file.name, file.size, 'bytes');
+      dbg('[cozy-bridge] file injected:', file.name, file.size, 'bytes');
     } catch (err) {
       console.error('[cozy-bridge] inject failed', err);
       alert('Injection PDF échouée: ' + err.message);
@@ -159,7 +154,7 @@
 
     function openPicker() {
       window.parent.postMessage({ type: 'cozy-open-picker' }, '*');
-      console.log('[cozy-bridge] cozy-open-picker sent to parent');
+      dbg('[cozy-bridge] cozy-open-picker sent to parent');
     }
     card.addEventListener('click', openPicker);
     card.addEventListener('keydown', function (e) {
@@ -167,7 +162,7 @@
     });
 
     wrapper.appendChild(card);
-    console.log('[cozy-bridge] Drive card injected');
+    dbg('[cozy-bridge] Drive card injected');
     return true;
   }
 
@@ -190,7 +185,7 @@
   }
 
   window.addEventListener('message', function (e) {
-    console.log('[cozy-bridge] postMessage received', {
+    dbg('[cozy-bridge] postMessage received', {
       origin: e.origin,
       dataType: e.data && e.data.type
     });
@@ -202,7 +197,7 @@
     if (d.type !== 'cozy-load-pdf') return;
     var ab = d.arrayBuffer;
     if (!ab && d.blob) {
-      console.log('[cozy-bridge] received blob (legacy), converting');
+      dbg('[cozy-bridge] received blob (legacy), converting');
       d.blob.arrayBuffer().then(function (buf) {
         var name = d.name || 'document.pdf';
         var file = new File([buf], name, { type: 'application/pdf' });
@@ -214,7 +209,7 @@
       console.warn('[cozy-bridge] no arrayBuffer/blob in payload', d);
       return;
     }
-    console.log('[cozy-bridge] arrayBuffer received', {
+    dbg('[cozy-bridge] arrayBuffer received', {
       byteLength: ab.byteLength,
       name: d.name
     });
