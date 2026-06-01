@@ -188,8 +188,8 @@
     const body = modal.querySelector('.drive-picker-body');
     const closeBtn = modal.querySelector('.drive-picker-close');
 
-    const DEBUG = new URLSearchParams(location.search).get('debug') === '1';
-    const dbg = (...a) => { if (DEBUG) console.log('[bentopdf]', ...a); };
+    // Logs always on while we debug the picker→iframe hand-off.
+    const dbg = (...a) => { console.log('[bentopdf-picker]', ...a); };
 
     const formatBytes = n => {
       if (!n && n !== 0) return '';
@@ -299,23 +299,31 @@
         + 'Téléchargement de « ' + (name || fileId) + ' »…'
         + '</div>';
       try {
+        dbg('pickPdf clicked', { fileId, name });
         const res = await fetch('https://' + cozyDomain + '/files/download/' + fileId, {
           credentials: 'include',
           headers: { 'Authorization': 'Bearer ' + cozyToken }
         });
+        dbg('download response', res.status, res.ok);
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const blob = await res.blob();
-        dbg('fetched', name, blob.size, 'bytes');
+        dbg('blob', { size: blob.size, type: blob.type });
         // Hand off to BentoPDF via postMessage. The receiving listener is
         // injected by nginx sub_filter on the BentoPDF vhost (see
         // bentopdf-app/infra/hermes-nginx-patch.py).
+        if (!iframe.contentWindow) {
+          throw new Error('iframe.contentWindow is null (iframe not loaded yet?)');
+        }
+        dbg('posting cozy-load-pdf to', BENTOPDF_BASE, 'iframe.src =', iframe.src);
         iframe.contentWindow.postMessage({
           type: 'cozy-load-pdf',
           name: name || 'document.pdf',
           blob: blob
         }, BENTOPDF_BASE);
+        dbg('postMessage sent');
         close();
       } catch (e) {
+        dbg('pickPdf failed', e);
         body.innerHTML = '<div class="drive-picker-status">'
           + 'Échec : ' + (e.message || String(e))
           + '</div>';
