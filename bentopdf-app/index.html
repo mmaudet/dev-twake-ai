@@ -178,6 +178,10 @@
   <script src="bar.js" defer></script>
   <script>
   (function () {
+    // Logs always on while we debug the picker→iframe hand-off.
+    const dbg = (...a) => { console.log('[bentopdf-picker]', ...a); };
+    dbg('coquille script boot at', new Date().toISOString());
+
     const BENTOPDF_BASE = 'https://bentopdf.dev-twake.maudet.cloud';
     const root = document.querySelector('[role=application]');
     const cozyToken = root.dataset.cozyToken;
@@ -187,9 +191,7 @@
     const modal = document.getElementById('drive-picker-modal');
     const body = modal.querySelector('.drive-picker-body');
     const closeBtn = modal.querySelector('.drive-picker-close');
-
-    // Logs always on while we debug the picker→iframe hand-off.
-    const dbg = (...a) => { console.log('[bentopdf-picker]', ...a); };
+    dbg('elements:', { root: !!root, iframe: !!iframe, fab: !!fab, modal: !!modal, body: !!body, closeBtn: !!closeBtn });
 
     const formatBytes = n => {
       if (!n && n !== 0) return '';
