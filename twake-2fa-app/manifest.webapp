@@ -1,0 +1,61 @@
+{
+  "name": "Twake 2FA LINAGORA",
+  "name_prefix": "",
+  "slug": "twake2fa",
+  "icon": "icon.png",
+  "categories": ["security"],
+  "version": "1.0.0",
+  "license": "Apache-2.0",
+  "editor": "Linagora",
+  "type": "webapp",
+  "source": "file:///home/mmaudet/work/dev.twake.ai/twake-2fa-app",
+  "developer": {
+    "name": "Linagora",
+    "url": "https://twake.ai/"
+  },
+  "locales": {
+    "fr": {
+      "name": "Twake 2FA LINAGORA",
+      "short_description": "Configurer la double authentification LINAGORA",
+      "long_description": "Raccourci vers la page d'enrôlement TOTP du SSO LINAGORA pour activer la double authentification sur ton compte."
+    },
+    "en": {
+      "name": "Twake 2FA LINAGORA",
+      "short_description": "Set up LINAGORA two-factor authentication",
+      "long_description": "Shortcut to the LINAGORA SSO TOTP enrolment page so you can enable 2FA on your account."
+    }
+  },
+  "default_locale": "fr",
+  "screenshots": [],
+  "permissions": {
+    "apps": {
+      "description": "Required by the cozy-bar to display the icons of the apps",
+      "type": "io.cozy.apps",
+      "verbs": ["GET"]
+    },
+    "settings": {
+      "description": "Required by cozy-bar for the settings menu",
+      "type": "io.cozy.settings",
+      "verbs": ["GET"]
+    },
+    "sharings": {
+      "description": "Required to have access to the sharings in realtime",
+      "type": "io.cozy.sharings",
+      "verbs": ["GET"]
+    },
+    "contacts": {
+      "description": "Required by cozy-bar to show the user menu",
+      "type": "io.cozy.contacts",
+      "verbs": ["GET"]
+    }
+  },
+  "routes": {
+    "/": {
+      "folder": "/",
+      "index": "index.html",
+      "public": false
+    }
+  },
+  "intents": [],
+  "services": {}
+}

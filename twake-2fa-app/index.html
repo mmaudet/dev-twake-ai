@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="{{.Locale}}">
+<head>
+  <meta charset="utf-8">
+  <title>{{.AppName}}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/png" href="icon.png">
+  <link rel="stylesheet" type="text/css" href="//{{.Domain}}/assets/fonts/fonts.css">
+  {{.CozyFonts}}
+  {{.ThemeCSS}}
+  <link rel="stylesheet" href="bar.css">
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #faf9f5; }
+    body.has-banner { display: flex; flex-direction: column; }
+    [role=application] {
+      flex: 1 1 auto;
+      min-height: 0;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      box-sizing: border-box;
+    }
+    .card {
+      max-width: 32rem;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      padding: 2rem 2.5rem;
+      font-family: system-ui, sans-serif;
+      color: #222;
+      text-align: center;
+    }
+    .card h1 {
+      margin: 0 0 0.5em;
+      font-size: 1.4rem;
+      font-weight: 600;
+    }
+    .card p {
+      margin: 0 0 1.5em;
+      color: #555;
+      line-height: 1.5;
+    }
+    .card .icon-large {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 1em;
+      display: block;
+    }
+    .card code {
+      background: #f3f3f7;
+      padding: 0.1em 0.4em;
+      border-radius: 3px;
+      font-size: 0.9em;
+      word-break: break-all;
+    }
+    .cta {
+      display: inline-block;
+      padding: 0.7em 1.6em;
+      font-size: 1em;
+      font-weight: 500;
+      border: 0;
+      border-radius: 4px;
+      background: #1FA8B9;
+      color: #fff;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .cta:hover { background: #178391; }
+    .hint {
+      margin-top: 1.5em;
+      font-size: 0.85em;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <div role="application"
+       data-cozy="{{.CozyData}}"
+       data-cozy-domain="{{.Domain}}"
+       data-cozy-token="{{.Token}}"
+       data-cozy-locale="{{.Locale}}"
+       data-cozy-app-slug="{{.AppSlug}}"
+       data-cozy-app-name="Twake 2FA LINAGORA"
+       data-cozy-app-name-prefix=""
+       data-cozy-app-editor="{{.AppEditor}}"
+       data-cozy-icon-path="icon.png">
+    <div class="card">
+      <img class="icon-large" src="icon.png" alt="">
+      <h1>Configurer la double authentification LINAGORA</h1>
+      <p>Active le second facteur (TOTP) sur ton compte SSO LINAGORA pour sécuriser ton accès. La page d'enrôlement s'ouvre dans un nouvel onglet.</p>
+      <a class="cta" id="open-2fa" href="https://sso.linagora.com/2fregisters/totp" target="_blank" rel="noopener noreferrer">
+        Configurer le 2FA
+      </a>
+      <div class="hint">
+        Lien direct : <code>https://sso.linagora.com/2fregisters/totp</code>
+      </div>
+    </div>
+  </div>
+  <script src="bar.js" defer></script>
+</body>
+</html>
