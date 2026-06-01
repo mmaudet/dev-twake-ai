@@ -56,6 +56,7 @@ fi
 
 DOMAIN="${SLUG}.dev-twake.maudet.cloud"
 APP_SRC="file://$(cd "$(dirname "$0")/../twake-space-app" && pwd)"
+BENTOPDF_SRC="file://$HOME/cozy-apps/bentopdf-app"
 APPS="home,store,drive,photos,settings,contacts,notes,passwords,dataproxy"
 AUTHELIA_DB=/opt/authelia/config/users_database.yml
 
@@ -136,6 +137,10 @@ cozy-stack instances add "$DOMAIN" \
 echo
 echo "== Installing twakespace from $APP_SRC"
 cozy-stack apps install twakespace "$APP_SRC" --domain "$DOMAIN"
+
+echo
+echo "== Installing bentopdf from $BENTOPDF_SRC"
+cozy-stack apps install bentopdf "$BENTOPDF_SRC" --domain "$DOMAIN"
 
 echo
 echo "== Triggering passphrase reset (CSRF dance)"
