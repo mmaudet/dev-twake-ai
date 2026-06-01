@@ -76,6 +76,25 @@
   // left = local upload (existing dropzone, untouched apart from
   // shrinking to 50%), right = our card that posts cozy-open-picker
   // to the parent coquille on click.
+  // Symmetric hover effect on both cards. Injected once, scoped by
+  // class so we never collide with BentoPDF's own styles.
+  function ensureCardStyles() {
+    if (document.getElementById('cozy-card-styles')) return;
+    var style = document.createElement('style');
+    style.id = 'cozy-card-styles';
+    style.textContent = [
+      '.cozy-local-card, #cozy-drive-card {',
+      '  transition: background 0.1s, border-color 0.1s;',
+      '}',
+      '.cozy-local-card:hover, #cozy-drive-card:hover, #cozy-drive-card:focus {',
+      '  background: rgba(124,124,135,0.06) !important;',
+      '  border-color: rgba(94,114,228,0.55) !important;',
+      '  outline: none;',
+      '}'
+    ].join('\n');
+    document.head.appendChild(style);
+  }
+
   function injectDriveCard() {
     var input = document.getElementById('file-input');
     if (!input) return false;
@@ -86,6 +105,8 @@
     var parent = dropzone.parentElement;
     if (!parent) return false;
 
+    ensureCardStyles();
+
     // Clean up artefacts from the previous "split inside dropzone" design.
     input.style.removeProperty('width');
     input.style.removeProperty('left');
@@ -94,6 +115,10 @@
     if (oldDivider) oldDivider.remove();
     var oldButton = dropzone.querySelector('#cozy-drive-button');
     if (oldButton) oldButton.remove();
+
+    // Tag the BentoPDF dropzone so our shared :hover rule applies to it
+    // too. We don't mutate the existing style attribute beyond that.
+    dropzone.classList.add('cozy-local-card');
 
     // Build the flex wrapper hosting the 2 cards.
     var wrapper = document.createElement('div');
@@ -122,7 +147,7 @@
       + 'padding:3rem 1.5rem;'
       + 'display:flex;flex-direction:column;'
       + 'align-items:center;justify-content:center;gap:0.5rem;'
-      + 'cursor:pointer;transition:background 0.1s,border-color 0.1s;'
+      + 'cursor:pointer;'
       + 'text-align:center;color:inherit;font:inherit;background:transparent;';
 
     card.innerHTML =
@@ -136,14 +161,6 @@
       window.parent.postMessage({ type: 'cozy-open-picker' }, '*');
       console.log('[cozy-bridge] cozy-open-picker sent to parent');
     }
-    card.addEventListener('mouseover', function () {
-      card.style.background = 'rgba(124,124,135,0.06)';
-      card.style.borderColor = 'rgba(94,114,228,0.55)';
-    });
-    card.addEventListener('mouseout', function () {
-      card.style.background = 'transparent';
-      card.style.borderColor = 'rgba(124,124,135,0.4)';
-    });
     card.addEventListener('click', openPicker);
     card.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPicker(); }
