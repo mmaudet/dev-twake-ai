@@ -5,8 +5,8 @@
 // "Document EXCALIDRAW / Télécharger ce fichier" screen, we should
 // bounce to the coquille that knows how to edit the format.
 //
-// Today the dispatched types are .excalidraw and .pdf; if we add more
-// (.tldraw, .quill, …), drop them in the same dispatch table.
+// Today the only such type is .excalidraw; if we add more (.tldraw,
+// .quill, …), drop them in the same dispatch table.
 
 import { generateWebLink } from 'cozy-client'
 
@@ -31,11 +31,6 @@ const HANDLERS = [
     matches: file => fileName(file).toLowerCase().endsWith('.excalidraw'),
     slug: 'excalidraw',
     hash: file => `/edit/${fileId(file)}`
-  },
-  {
-    matches: file => fileName(file).toLowerCase().endsWith('.pdf'),
-    slug: 'bentopdf',
-    hash: file => `/file/${fileId(file)}`
   }
 ]
 
