@@ -1,0 +1,66 @@
+{
+  "name": "PDF Toolkit",
+  "name_prefix": "",
+  "slug": "bentopdf",
+  "icon": "icon.png",
+  "categories": ["productivity"],
+  "version": "1.0.0",
+  "license": "AGPL-3.0",
+  "editor": "Linagora",
+  "type": "webapp",
+  "source": "file:///home/mmaudet/work/dev.twake.ai/bentopdf-app",
+  "developer": {
+    "name": "Linagora",
+    "url": "https://twake.ai/"
+  },
+  "locales": {
+    "fr": {
+      "name": "PDF Toolkit",
+      "short_description": "Édition de PDF dans le navigateur (BentoPDF)",
+      "long_description": "Coquille Cozy autour de BentoPDF (bentopdf.com), un toolkit PDF qui tourne 100 % côté browser. Permet de fusionner, découper, signer, compresser, OCR, etc. Les PDF du Drive peuvent être ouverts directement via #/file/<fileId>."
+    },
+    "en": {
+      "name": "PDF Toolkit",
+      "short_description": "In-browser PDF editing (BentoPDF)",
+      "long_description": "Cozy wrapper around BentoPDF (bentopdf.com), a 100% browser-side PDF toolkit (merge, split, sign, compress, OCR, …). Drive PDFs open directly via #/file/<fileId>."
+    }
+  },
+  "default_locale": "fr",
+  "screenshots": [],
+  "permissions": {
+    "apps": {
+      "description": "Required by the cozy-bar to display the icons of the apps",
+      "type": "io.cozy.apps",
+      "verbs": ["GET"]
+    },
+    "settings": {
+      "description": "Required by cozy-bar for the settings menu",
+      "type": "io.cozy.settings",
+      "verbs": ["GET"]
+    },
+    "sharings": {
+      "description": "Required to have access to the sharings in realtime",
+      "type": "io.cozy.sharings",
+      "verbs": ["GET"]
+    },
+    "contacts": {
+      "description": "Required by cozy-bar to show the user menu",
+      "type": "io.cozy.contacts",
+      "verbs": ["GET"]
+    },
+    "files": {
+      "description": "Required to download PDFs from the Drive into BentoPDF and save edited PDFs back.",
+      "type": "io.cozy.files",
+      "verbs": ["GET", "POST", "PUT", "PATCH"]
+    }
+  },
+  "routes": {
+    "/": {
+      "folder": "/",
+      "index": "index.html",
+      "public": false
+    }
+  },
+  "intents": [],
+  "services": {}
+}

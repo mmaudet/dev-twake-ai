@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="{{.Locale}}">
+<head>
+  <meta charset="utf-8">
+  <title>{{.AppName}}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/png" href="icon.png">
+  <link rel="stylesheet" type="text/css" href="//{{.Domain}}/assets/fonts/fonts.css">
+  {{.CozyFonts}}
+  {{.ThemeCSS}}
+  <link rel="stylesheet" href="bar.css">
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #faf9f5; }
+    body.has-banner { display: flex; flex-direction: column; }
+    [role=application] {
+      flex: 1 1 auto;
+      min-height: 0;
+      width: 100%;
+    }
+    [role=application] > iframe {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      display: block;
+    }
+    .bridge-pane {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      font-family: system-ui, sans-serif;
+      color: #333;
+      gap: 1.5em;
+      padding: 1rem;
+      box-sizing: border-box;
+      text-align: center;
+    }
+    .bridge-pane .spinner {
+      width: 48px; height: 48px;
+      border: 4px solid #e0e0e0;
+      border-top-color: #ED7B23;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .bridge-pane button {
+      padding: 0.6em 1.4em;
+      font-size: 1em;
+      border: 0;
+      border-radius: 4px;
+      background: #ED7B23;
+      color: white;
+      cursor: pointer;
+    }
+    .bridge-pane code {
+      background: #f3f3f7;
+      padding: 0.1em 0.4em;
+      border-radius: 3px;
+      font-size: 0.9em;
+    }
+  </style>
+</head>
+<body>
+  <div role="application"
+       data-cozy="{{.CozyData}}"
+       data-cozy-domain="{{.Domain}}"
+       data-cozy-token="{{.Token}}"
+       data-cozy-locale="{{.Locale}}"
+       data-cozy-app-slug="{{.AppSlug}}"
+       data-cozy-app-name="PDF Toolkit"
+       data-cozy-app-name-prefix=""
+       data-cozy-app-editor="{{.AppEditor}}"
+       data-cozy-icon-path="icon.png">
+  </div>
+  <script src="bar.js" defer></script>
+  <script>
+  (function () {
+    const BENTOPDF_BASE = 'https://bentopdf.dev-twake.maudet.cloud';
+    const root = document.querySelector('[role=application]');
+    const cozyToken = root.dataset.cozyToken;
+    const cozyDomain = root.dataset.cozyDomain;
+
+    // Debug gate: enable with ?debug=1 to surface bridge traces in the console.
+    const DEBUG = new URLSearchParams(location.search).get('debug') === '1';
+    function dbg() { if (DEBUG) console.log.apply(console, arguments); }
+
+    function renderIframe(src) {
+      root.innerHTML = '';
+      const f = document.createElement('iframe');
+      f.src = src || BENTOPDF_BASE + '/';
+      f.title = 'BentoPDF';
+      f.allow = 'clipboard-read; clipboard-write';
+      root.appendChild(f);
+      return f;
+    }
+
+    function renderPane(htmlMsg, action) {
+      root.innerHTML = '';
+      const div = document.createElement('div');
+      div.className = 'bridge-pane';
+      const sp = document.createElement('div');
+      sp.className = 'spinner';
+      const txt = document.createElement('div');
+      txt.innerHTML = htmlMsg;
+      div.appendChild(sp);
+      div.appendChild(txt);
+      if (action) {
+        const btn = document.createElement('button');
+        btn.textContent = action.label;
+        btn.onclick = action.onClick;
+        div.appendChild(btn);
+      }
+      root.appendChild(div);
+    }
+
+    // Phase-2 hook: fetch a PDF from the Drive and try to hand it to the
+    // BentoPDF iframe via postMessage. BentoPDF upstream does not yet listen
+    // for this message, so today this is a no-op on their side: the iframe
+    // loads its empty home and the user still has to drop the PDF manually.
+    // The fetch + Blob materialization is kept so we can:
+    //   1. show the file metadata in the shell (name, size) for context,
+    //   2. trigger a programmatic file_save_as so the browser offers the file
+    //      as a download / clipboard target,
+    //   3. wire the real auto-load the day BentoPDF (or a sub_filter / fork)
+    //      acknowledges window.postMessage({type:'cozy-load-pdf', …}).
+    async function openDriveFile(fileId) {
+      renderPane('Récupération du PDF depuis le Drive…');
+      let meta, blob;
+      try {
+        const metaRes = await fetch('https://' + cozyDomain + '/files/' + fileId, {
+          credentials: 'include',
+          headers: {
+            'Authorization': 'Bearer ' + cozyToken,
+            'Accept': 'application/vnd.api+json'
+          }
+        });
+        if (!metaRes.ok) throw new Error('GET /files/' + fileId + ' → ' + metaRes.status);
+        meta = (await metaRes.json()).data;
+        const name = (meta.attributes && meta.attributes.name) || ('file-' + fileId + '.pdf');
+        const dlRes = await fetch('https://' + cozyDomain + '/files/download/' + fileId, {
+          credentials: 'include',
+          headers: { 'Authorization': 'Bearer ' + cozyToken }
+        });
+        if (!dlRes.ok) throw new Error('GET /files/download/' + fileId + ' → ' + dlRes.status);
+        blob = await dlRes.blob();
+        dbg('[bentopdf] fetched', name, blob.size, 'bytes from Drive');
+
+        const iframe = renderIframe(BENTOPDF_BASE + '/');
+        // Best-effort hand-off: ping the iframe once it loads. If BentoPDF
+        // ever adds a listener (or we add one via nginx sub_filter / fork),
+        // it can pick the blob up; otherwise we just surface an info banner.
+        iframe.addEventListener('load', () => {
+          try {
+            iframe.contentWindow.postMessage({
+              type: 'cozy-load-pdf',
+              name,
+              blob
+            }, BENTOPDF_BASE);
+            dbg('[bentopdf] postMessage cozy-load-pdf sent');
+          } catch (e) {
+            dbg('[bentopdf] postMessage failed:', e.message);
+          }
+        }, { once: true });
+
+        // Also offer the user a manual route: tab-title + a downloadable copy
+        // they can drag-drop into the iframe. We attach the blob to a global
+        // so a small bookmarklet / overlay can grab it later if needed.
+        window.__cozyPdfBlob = { name, blob, fileId };
+        document.title = name + ' — PDF Toolkit';
+      } catch (e) {
+        renderPane(
+          'Impossible de charger le PDF depuis le Drive.<br>'
+            + '<code>' + (e.message || e) + '</code>',
+          { label: 'Ouvrir BentoPDF vide', onClick: () => renderIframe() }
+        );
+      }
+    }
+
+    // Hash router.
+    // - #/file/<fileId>  → fetch the PDF from the Drive, frame BentoPDF, try
+    //                      to hand the blob over via postMessage
+    // - anything else    → frame BentoPDF empty home
+    const hash = location.hash || '';
+    const m = hash.match(/^#\/file\/([^/?#]+)/);
+    if (m) {
+      openDriveFile(decodeURIComponent(m[1]));
+    } else {
+      renderIframe();
+    }
+  })();
+  </script>
+</body>
+</html>
