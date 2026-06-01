@@ -18,6 +18,7 @@
       width: 100%;
       height: 100%;
       display: flex;
+      position: relative;
     }
     [role=application] > iframe {
       flex: 1 1 auto;
@@ -25,6 +26,122 @@
       height: 100%;
       border: 0;
       display: block;
+    }
+
+    /* Floating "open from Drive" button, anchored above the iframe in
+       the top-right corner. Stays visible while the iframe is in use. */
+    #drive-picker-fab {
+      position: absolute;
+      top: 12px;
+      right: 16px;
+      z-index: 100;
+      padding: 0.55em 1em;
+      font: 600 0.9em system-ui, sans-serif;
+      background: #4f46e5;
+      color: #fff;
+      border: 0;
+      border-radius: 6px;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4em;
+    }
+    #drive-picker-fab:hover { background: #4338ca; }
+    #drive-picker-fab::before {
+      content: '📁';
+      font-size: 1.1em;
+    }
+
+    /* Modal overlay listing Drive PDFs */
+    #drive-picker-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      background: rgba(0,0,0,0.55);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      box-sizing: border-box;
+    }
+    #drive-picker-modal[data-open="true"] { display: flex; }
+    .drive-picker-panel {
+      background: #fff;
+      color: #1a1d29;
+      width: 100%;
+      max-width: 640px;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      border-radius: 10px;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.35);
+      font-family: system-ui, sans-serif;
+      overflow: hidden;
+    }
+    .drive-picker-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1em 1.25em;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .drive-picker-header h2 { margin: 0; font-size: 1.05rem; }
+    .drive-picker-close {
+      background: none; border: 0; cursor: pointer;
+      font-size: 1.2rem; padding: 0 .5em; color: #4b5563;
+    }
+    .drive-picker-body {
+      overflow-y: auto;
+      flex: 1 1 auto;
+      padding: 0.5em 0;
+    }
+    .drive-picker-status {
+      padding: 1.5em 1.25em;
+      color: #4b5563;
+      text-align: center;
+      font-size: 0.9rem;
+    }
+    .drive-picker-list { list-style: none; margin: 0; padding: 0; }
+    .drive-picker-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75em;
+      padding: 0.7em 1.25em;
+      border-bottom: 1px solid #f3f4f6;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .drive-picker-item:hover,
+    .drive-picker-item:focus {
+      background: #f3f4f6;
+      outline: none;
+    }
+    .drive-picker-item .pdf-glyph {
+      width: 28px; height: 28px;
+      background: #fee2e2;
+      color: #b91c1c;
+      border-radius: 4px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .drive-picker-item .pdf-meta {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+    .drive-picker-item .pdf-name {
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .drive-picker-item .pdf-sub {
+      font-size: 0.8rem;
+      color: #6b7280;
     }
   </style>
 </head>
@@ -39,11 +156,172 @@
        data-cozy-app-name-prefix=""
        data-cozy-app-editor="{{.AppEditor}}"
        data-cozy-icon-path="icon.png">
+    <button id="drive-picker-fab" type="button">Ouvrir depuis le Drive</button>
     <iframe id="bentopdf-frame"
             src="https://bentopdf.dev-twake.maudet.cloud/"
             title="BentoPDF"
             allow="clipboard-read; clipboard-write"></iframe>
   </div>
+
+  <div id="drive-picker-modal" role="dialog" aria-modal="true" aria-labelledby="drive-picker-title">
+    <div class="drive-picker-panel">
+      <div class="drive-picker-header">
+        <h2 id="drive-picker-title">Choisir un PDF depuis le Drive</h2>
+        <button type="button" class="drive-picker-close" aria-label="Fermer">✕</button>
+      </div>
+      <div class="drive-picker-body">
+        <div class="drive-picker-status">Chargement…</div>
+      </div>
+    </div>
+  </div>
+
   <script src="bar.js" defer></script>
+  <script>
+  (function () {
+    const BENTOPDF_BASE = 'https://bentopdf.dev-twake.maudet.cloud';
+    const root = document.querySelector('[role=application]');
+    const cozyToken = root.dataset.cozyToken;
+    const cozyDomain = root.dataset.cozyDomain;
+    const iframe = document.getElementById('bentopdf-frame');
+    const fab = document.getElementById('drive-picker-fab');
+    const modal = document.getElementById('drive-picker-modal');
+    const body = modal.querySelector('.drive-picker-body');
+    const closeBtn = modal.querySelector('.drive-picker-close');
+
+    const DEBUG = new URLSearchParams(location.search).get('debug') === '1';
+    const dbg = (...a) => { if (DEBUG) console.log('[bentopdf]', ...a); };
+
+    const formatBytes = n => {
+      if (!n && n !== 0) return '';
+      const u = ['B','KB','MB','GB'];
+      let i = 0;
+      while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+      return n.toFixed(n >= 10 ? 0 : 1) + ' ' + u[i];
+    };
+    const formatDate = ts => {
+      try {
+        return new Date(ts).toLocaleDateString(undefined, {
+          year: 'numeric', month: 'short', day: 'numeric'
+        });
+      } catch (e) { return ''; }
+    };
+
+    function open() {
+      modal.dataset.open = 'true';
+      body.innerHTML = '<div class="drive-picker-status">Chargement…</div>';
+      fetchPdfs().then(render).catch(showError);
+    }
+    function close() { modal.dataset.open = 'false'; }
+
+    fab.addEventListener('click', open);
+    closeBtn.addEventListener('click', close);
+    modal.addEventListener('click', e => { if (e.target === modal) close(); });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && modal.dataset.open === 'true') close();
+    });
+
+    async function fetchPdfs() {
+      // Mango _find on io.cozy.files. No index on `mime` exists by default,
+      // so we ask for files updated recently and let the server filter by
+      // mime. With `use_index` omitted, cozy-stack falls back to
+      // _all_docs, which is fine for our scale (a few thousand files).
+      const res = await fetch('https://' + cozyDomain + '/files/_find', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Authorization': 'Bearer ' + cozyToken,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          selector: {
+            type: 'file',
+            mime: 'application/pdf',
+            trashed: false
+          },
+          sort: [{ updated_at: 'desc' }],
+          limit: 50
+        })
+      });
+      if (!res.ok) {
+        throw new Error('HTTP ' + res.status + ' on /files/_find');
+      }
+      const json = await res.json();
+      return (json && (json.data || json.docs)) || [];
+    }
+
+    function render(docs) {
+      if (!docs.length) {
+        body.innerHTML = '<div class="drive-picker-status">'
+          + 'Aucun PDF dans ton Drive.'
+          + '</div>';
+        return;
+      }
+      const ul = document.createElement('ul');
+      ul.className = 'drive-picker-list';
+      for (const d of docs) {
+        const a = d.attributes || d;
+        const li = document.createElement('li');
+        li.className = 'drive-picker-item';
+        li.setAttribute('tabindex', '0');
+        li.setAttribute('role', 'button');
+        li.innerHTML = ''
+          + '<span class="pdf-glyph">PDF</span>'
+          + '<div class="pdf-meta">'
+          +   '<div class="pdf-name"></div>'
+          +   '<div class="pdf-sub"></div>'
+          + '</div>';
+        li.querySelector('.pdf-name').textContent = a.name || '(sans nom)';
+        const size = formatBytes(parseInt(a.size, 10));
+        const date = formatDate(a.updated_at || a.created_at);
+        li.querySelector('.pdf-sub').textContent = [size, date].filter(Boolean).join(' · ');
+        const fileId = d.id || d._id;
+        li.addEventListener('click', () => pickPdf(fileId, a.name));
+        li.addEventListener('keydown', e => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pickPdf(fileId, a.name); }
+        });
+        ul.appendChild(li);
+      }
+      body.innerHTML = '';
+      body.appendChild(ul);
+    }
+
+    function showError(err) {
+      dbg('fetch error', err);
+      body.innerHTML = '<div class="drive-picker-status">'
+        + 'Impossible de lister les PDFs : '
+        + (err.message || String(err))
+        + '</div>';
+    }
+
+    async function pickPdf(fileId, name) {
+      body.innerHTML = '<div class="drive-picker-status">'
+        + 'Téléchargement de « ' + (name || fileId) + ' »…'
+        + '</div>';
+      try {
+        const res = await fetch('https://' + cozyDomain + '/files/download/' + fileId, {
+          credentials: 'include',
+          headers: { 'Authorization': 'Bearer ' + cozyToken }
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const blob = await res.blob();
+        dbg('fetched', name, blob.size, 'bytes');
+        // Hand off to BentoPDF via postMessage. The receiving listener is
+        // injected by nginx sub_filter on the BentoPDF vhost (see
+        // bentopdf-app/infra/hermes-nginx-patch.py).
+        iframe.contentWindow.postMessage({
+          type: 'cozy-load-pdf',
+          name: name || 'document.pdf',
+          blob: blob
+        }, BENTOPDF_BASE);
+        close();
+      } catch (e) {
+        body.innerHTML = '<div class="drive-picker-status">'
+          + 'Échec : ' + (e.message || String(e))
+          + '</div>';
+      }
+    }
+  })();
+  </script>
 </body>
 </html>
