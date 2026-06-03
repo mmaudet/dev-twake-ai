@@ -1,6 +1,6 @@
 {
-  "name": "Twake Space",
-  "name_prefix": "Twake",
+  "name": "Space",
+  "name_prefix": "",
   "slug": "twakespace",
   "icon": "icon.svg",
   "categories": ["productivity"],
@@ -15,12 +15,12 @@
   },
   "locales": {
     "fr": {
-      "name": "Twake Space",
+      "name": "Space",
       "short_description": "Démo collaborative Twake Space",
       "long_description": "Démonstration interactive du module Twake Space : espaces collaboratifs, documents versionnés, messagerie, tâches Kanban, agenda et synthèses IA."
     },
     "en": {
-      "name": "Twake Space",
+      "name": "Space",
       "short_description": "Twake Space collaborative demo"
     }
   },
