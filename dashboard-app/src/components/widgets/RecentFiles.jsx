@@ -44,6 +44,13 @@ const EXTERNAL_APP_HANDLERS = [
     matches: file => (file.name || '').toLowerCase().endsWith('.excalidraw'),
     slug: 'excalidraw',
     hash: fileId => `/edit/${fileId}`
+  },
+  {
+    matches: file =>
+      file.mime === 'application/pdf' ||
+      (file.name || '').toLowerCase().endsWith('.pdf'),
+    slug: 'bentopdf',
+    hash: fileId => `/edit/${fileId}`
   }
 ]
 
@@ -133,12 +140,27 @@ const RecentFiles = () => {
   )
 }
 
-// Pick a file-type icon: Excalidraw for *.excalidraw files, the Grist petal
-// for shortcuts that point to a Grist doc, and the cozy-ui defaults
-// otherwise (chain link for generic shortcuts, cloud for regular files).
+// Pick a file-type icon: Excalidraw for *.excalidraw, PDF badge for PDFs,
+// Grist petal for shortcuts that point to a Grist doc, cozy-ui defaults
+// otherwise.
 const FileTypeIcon = ({ file, isShortcut }) => {
-  if (file.name && file.name.toLowerCase().endsWith('.excalidraw')) {
+  const name = (file.name || '').toLowerCase()
+  if (name.endsWith('.excalidraw')) {
     return <img src={excalidrawIcon} alt="Excalidraw" width={20} height={20} style={{ borderRadius: 3, display: 'block' }} />
+  }
+  if (file.mime === 'application/pdf' || name.endsWith('.pdf')) {
+    return (
+      <span
+        aria-label="PDF"
+        style={{
+          width: 24, height: 24,
+          background: '#fde4e4', color: '#c0392b',
+          borderRadius: 3, fontSize: 9, fontWeight: 700,
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          letterSpacing: 0.4
+        }}
+      >PDF</span>
+    )
   }
   const target = file.metadata && file.metadata.target
   if (isShortcut && target && target.app === 'grist') {
