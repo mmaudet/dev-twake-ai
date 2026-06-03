@@ -46,13 +46,22 @@
     });
   }
 
+  // If the host page hasn't rendered the tool's #file-input yet (e.g.
+  // because the parent sent the file right after navigating the iframe
+  // to /fr/edit-pdf), we stash the file and let the existing
+  // MutationObserver pick it up when the input appears. Without this,
+  // a fast deep-link from the dashboard or the Drive lands on an
+  // empty tool view.
+  var pendingFile = null;
   function injectFile(file) {
     var input = document.getElementById('file-input');
     dbg('[cozy-bridge] looking for #file-input, found:', !!input);
     if (!input) {
-      alert('Choisis d’abord un outil PDF (Fusionner, Scinder, Compresser…) puis recommence.');
+      dbg('[cozy-bridge] #file-input not mounted yet, stashing');
+      pendingFile = file;
       return;
     }
+    pendingFile = null;
     try {
       var dt = new DataTransfer();
       dt.items.add(file);
@@ -63,6 +72,14 @@
       console.error('[cozy-bridge] inject failed', err);
       alert('Injection PDF échouée: ' + err.message);
     }
+  }
+  function tryFlushPendingFile() {
+    if (!pendingFile) return;
+    var input = document.getElementById('file-input');
+    if (!input) return;
+    var file = pendingFile;
+    pendingFile = null;
+    injectFile(file);
   }
 
   // Wrap BentoPDF's local dropzone with a second, visually symmetric
@@ -173,6 +190,7 @@
   if (!injectDriveCard()) {
     var dropzoneObserver = new MutationObserver(function () {
       injectDriveCard();
+      tryFlushPendingFile();
     });
     dropzoneObserver.observe(document.body, { childList: true, subtree: true });
   } else {
@@ -180,6 +198,7 @@
     // changes so a fresh dropzone gets the card too.
     var dropzoneObserver = new MutationObserver(function () {
       injectDriveCard();
+      tryFlushPendingFile();
     });
     dropzoneObserver.observe(document.body, { childList: true, subtree: true });
   }
