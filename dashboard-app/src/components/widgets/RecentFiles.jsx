@@ -34,6 +34,25 @@ const buildDriveFileUrl = (cozyUrl, dirId, fileId) => {
   return `${u.protocol}//${host}/#/folder/${dirId}/file/${fileId}`
 }
 
+// External coquilles that own a given file extension. The widget bypasses
+// the Drive file viewer (which would render the generic "Document XYZ /
+// Télécharger" stub) and opens these files directly in their coquille,
+// mirroring the dispatch the Drive fork does on a double-click in the
+// list. Keys are lowercase extensions, values are slug + hash builder.
+const EXTERNAL_APP_HANDLERS = [
+  {
+    matches: file => (file.name || '').toLowerCase().endsWith('.excalidraw'),
+    slug: 'excalidraw',
+    hash: fileId => `/edit/${fileId}`
+  }
+]
+
+const buildExternalAppUrl = (cozyUrl, slug, hash) => {
+  const u = new URL(cozyUrl)
+  const host = u.host.replace(/^([^.]+)\./, '$1-' + slug + '.')
+  return `${u.protocol}//${host}/#${hash}`
+}
+
 // cozy-stack exposes GET /shortcuts/:id which returns the resolved URL +
 // the parsed target metadata as JSON (when Accept: application/json).
 const fetchShortcutInfo = async (client, fileId) => {
@@ -59,6 +78,16 @@ const openFile = async (client, cozyUrl, file) => {
       // eslint-disable-next-line no-console
       console.warn('[dashboard] could not resolve shortcut, falling back to Drive', e)
     }
+  }
+  // Files that belong to an external coquille (.excalidraw, …) skip the
+  // Drive file viewer entirely — the viewer would render the generic
+  // "Document XYZ / Télécharger" stub even though the Drive fork knows
+  // how to dispatch them. We jump straight to the coquille like the Drive
+  // dispatcher would do on a double-click.
+  const handler = EXTERNAL_APP_HANDLERS.find(h => h.matches(file))
+  if (handler) {
+    window.open(buildExternalAppUrl(cozyUrl, handler.slug, handler.hash(file._id)), '_blank')
+    return
   }
   window.open(buildDriveFileUrl(cozyUrl, file.dir_id, file._id), '_blank')
 }
