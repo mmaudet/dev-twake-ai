@@ -55,6 +55,7 @@ dashboard-backend/    ← backend Node.js (Express)
 | Widget RecentFiles : URL des shortcuts Grist | `dashboard-app/src/components/widgets/RecentFiles.jsx` | Utilise `info.url` directement (déjà bien formé par la coquille grist depuis `338ab936b`). Commit `28f0a5684` `[audit]` — avant : reconstruction buggy `<slug>-grist.<domain>/o/<org>/<docId>` → 404. |
 | Widget RecentFiles : icônes file-type | `dashboard-app/src/components/widgets/RecentFiles.jsx:FileTypeIcon` | `.excalidraw` → icône Excalidraw, shortcut Grist → pétale Grist. Icônes vendored dans `dashboard-app/src/assets/`. Commit `369ac4531`. |
 | Widget RecentFiles : dispatch `.excalidraw` vers coquille | `dashboard-app/src/components/widgets/RecentFiles.jsx:openFile + EXTERNAL_APP_HANDLERS` | Avant `7dc797724` : un clic sur un `.excalidraw` ouvrait le file viewer Drive (stub « Document EXCALIDRAW / Télécharger ») au lieu de la coquille. Le widget construisait `<slug>-drive.<domain>/#/folder/<dir>/file/<id>` qui n'évalue pas le HANDLER du Drive forké. Fix : table `EXTERNAL_APP_HANDLERS` qui matche l'extension et route directement vers `<slug>-excalidraw.<domain>/#/edit/<id>`. Mirror du dispatch Drive côté widget. |
+| Widget RecentFiles : dispatch `.pdf` vers coquille | `dashboard-app/src/components/widgets/RecentFiles.jsx:EXTERNAL_APP_HANDLERS` | Avant `45600417a` : un clic sur un `.pdf` ouvrait le stub Drive viewer. Fix : deuxième entrée dans `EXTERNAL_APP_HANDLERS` (`mime === 'application/pdf'` ou `.pdf` extension) → `<slug>-bentopdf.<domain>/#/edit/<id>`. Le hash router de la coquille bentopdf (commit `becd94061`) ouvre `/fr/edit-pdf` et auto-charge le PDF via le bridge. Ajout d'un badge `PDF` rouge dans `FileTypeIcon` pour cohérence visuelle avec Excalidraw / Grist. |
 
 ## Déploiement
 
@@ -77,6 +78,7 @@ Le `dashboard-backend/` tourne indépendamment sur athena (systemd user unit `da
   - `28f0a5684` — RecentFiles trust `info.url` au lieu de reconstruire (fix 404 sur shortcuts Grist)
   - `369ac4531` — icônes file-type Excalidraw/Grist dans RecentFiles
   - `7dc797724` — dispatch `.excalidraw` directement vers la coquille (avant : stub Drive viewer)
+  - `45600417a` — dispatch `.pdf` vers la coquille bentopdf + badge PDF rouge dans `FileTypeIcon`
 
 ## Points à confirmer avec l'équipe
 

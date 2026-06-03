@@ -72,14 +72,37 @@ bentopdf-app/
 
 ## Le bridge JS (`/cozy-bridge.js`)
 
-Injecté dans chaque page BentoPDF, il fait 4 choses :
+Injecté dans chaque page BentoPDF, il fait 5 choses :
 
 1. **Block du service worker BentoPDF**. Le SW recharge l'iframe à son activation, ce qui faisait silencieusement échouer le pipeline `postMessage` parent→iframe (bug observé en sessions multiples avant identification de la cause).
 2. **Inject la carte « Depuis votre Drive »** à droite de la dropzone BentoPDF native (qui devient la carte gauche). Les 2 cartes sont visuellement symétriques (dashed border, padding, hover identique).
 3. **Reçoit `postMessage({type:'cozy-load-pdf', name, arrayBuffer})`** de la coquille parent, recrée un `File`, et le pousse dans `#file-input` via `DataTransfer + change event` → BentoPDF traite le PDF comme un drag-drop natif.
-4. **Émet `postMessage({type:'cozy-open-picker'})` vers le parent** quand l'utilisateur clique sur la carte Drive — la coquille parent ouvre alors le modal du file picker.
+4. **Si `#file-input` n'est pas encore monté** (typique d'un deep-link rapide qui post le payload juste après avoir changé `iframe.src` vers `/fr/edit-pdf`), le bridge stash le file dans `pendingFile` et le flush dès qu'il voit l'input apparaître via son `MutationObserver` existant. Plus de prompt « Choisis d'abord un outil PDF… ».
+5. **Émet `postMessage({type:'cozy-open-picker'})` vers le parent** quand l'utilisateur clique sur la carte Drive — la coquille parent ouvre alors le modal du file picker.
 
 Verbose logs derrière `?debug=1` sur l'URL de l'iframe.
+
+## Hash router de la coquille (deep-link)
+
+`bentopdf-app/index.html` écoute les routes :
+
+- `#/edit/<fileId>` → ouvre `bentopdf.dev-twake.maudet.cloud/fr/edit-pdf` dans l'iframe + auto-load du PDF Drive.
+- `#/tool/<toolSlug>/<fileId>` → variante, ouvre `/fr/<toolSlug>` (futur — par défaut on route sur edit-pdf).
+
+Au boot et à chaque `hashchange`, la coquille :
+
+1. Re-pointe l'iframe vers `/fr/<tool>` (page de l'outil).
+2. Lance en parallèle `GET /files/<fileId>` (méta — pour récupérer le nom) + `GET /files/download/<fileId>` (binaire).
+3. Attend l'event `load` de l'iframe + le téléchargement.
+4. `postMessage({type:'cozy-load-pdf', name, arrayBuffer}, '*')` au contentWindow → le bridge l'injecte dans `#file-input` (ou stash dans `pendingFile` si l'input n'est pas encore monté).
+
+Consommateurs du deep-link :
+
+| Origine | Route produite |
+|---------|----------------|
+| Drive forké (`feature/twake-drive-fork`) — HANDLER `.pdf` dans `externalAppRedirect.js` | `<slug>-bentopdf.<domain>/#/edit/<fileId>` |
+| Dashboard widget RecentFiles — entrée `.pdf` dans `EXTERNAL_APP_HANDLERS` | idem |
+| Liens partagés / deep URLs sur des PDF | idem (via redirect Drive) |
 
 ## Le file picker côté coquille
 

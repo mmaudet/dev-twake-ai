@@ -44,6 +44,9 @@ Trois statuts par finding :
 | Medium | `scripts/deploy-app.sh` ne supportait pas le slug `dashboard` + cassait si la branche cible était dans un linked worktree | `scripts/deploy-app.sh` | `947eec000` sur `feature/twake-space` |
 | Medium | `deploy-app.sh` healthcheck parsait du JSON en awk text → tous les healthchecks reportaient FAIL même quand le deploy passait | `scripts/deploy-app.sh` | `c6a0cb972` `[audit]` sur `feature/twake-space` |
 | Medium | Dashboard widget RecentFiles : clic sur un fichier `.excalidraw` ouvrait le file viewer Drive (stub « Document EXCALIDRAW / Télécharger ») au lieu de la coquille Excalidraw | `dashboard-app/src/components/widgets/RecentFiles.jsx:openFile` | `7dc797724` `[audit]` sur `feature/dashboard` |
+| Medium | Drive double-click sur un `.pdf` retournait le viewer stub au lieu d'ouvrir BentoPDF (le HANDLER `.pdf` avait été reverted en `b81979301` parce que la coquille bentopdf ne pouvait pas charger un PDF du Drive ; ré-activé maintenant que la coquille a un hash router `#/edit/<fileId>`) | `twake-drive/src/modules/viewer/externalAppRedirect.js` | `ad3adceb0` sur `feature/twake-drive-fork` |
+| Medium | Dashboard widget RecentFiles : clic sur un fichier `.pdf` ouvrait le viewer Drive sans CTA pour éditer dans BentoPDF | `dashboard-app/src/components/widgets/RecentFiles.jsx:EXTERNAL_APP_HANDLERS` | `45600417a` sur `feature/dashboard` |
+| Medium | Coquille bentopdf : pas de deep-link pour ouvrir un PDF du Drive (les autres routes ne pouvaient pas dispatcher vers elle) | `bentopdf-app/index.html` hash router + `bentopdf-app/infra/cozy-bridge.js` pending-file slot | `becd94061` sur `feature/bentopdf` |
 
 ### 1.4. Nouvelles surfaces ajoutées (quatrième vague)
 
