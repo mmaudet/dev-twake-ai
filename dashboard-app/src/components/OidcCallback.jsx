@@ -26,34 +26,33 @@ const OidcCallback = () => {
         setError('Code manquant dans la réponse OIDC')
         return
       }
-      if (!pkce || pkce.state !== state) {
-        setError('State OIDC invalide ou expiré — relance la connexion')
-        return
-      }
-      // Reject stale state: a verifier older than PKCE_TTL_MS will not match
-      // the code Linagora just issued (the SSO has its own short TTL on
-      // authorization codes too, but we don't want to blindly POST a verifier
-      // from yesterday's tab).
-      if (!pkce.created_at || Date.now() - pkce.created_at > PKCE_TTL_MS) {
+      // Two flows land here:
+      //   1. Frontend-initiated: sessionStorage has the verifier; we POST it.
+      //   2. Agent-initiated: the backend generated the PKCE and keeps the
+      //      verifier server-side keyed by state. We POST { code, state } and
+      //      the backend looks the verifier up.
+      const isAgentFlow = !pkce || pkce.state !== state
+      if (!isAgentFlow && pkce.created_at && Date.now() - pkce.created_at > PKCE_TTL_MS) {
+        // Frontend flow with a stale tab: reject before bouncing on Linagora.
         sessionStorage.removeItem('linagora_pkce')
         setError('Connexion expirée (plus de 5 minutes) — relance depuis le widget')
         return
       }
+      const body = isAgentFlow
+        ? { code, state }
+        : { code, code_verifier: pkce.code_verifier, widget: pkce.widget }
       try {
         const res = await fetch(`${BACKEND_BASE}/oidc/callback`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({
-            code,
-            code_verifier: pkce.code_verifier,
-            widget: pkce.widget
-          })
+          body: JSON.stringify(body)
         })
         const json = await res.json()
         if (!res.ok || !json.ok) throw new Error(json.error || `HTTP ${res.status}`)
-        sessionStorage.removeItem('linagora_pkce')
-        const widgetLabel = pkce.widget === 'mail' ? 'Mail LINAGORA' : 'Agenda LINAGORA'
+        if (!isAgentFlow) sessionStorage.removeItem('linagora_pkce')
+        const widget = isAgentFlow ? (json.widget || 'calendar') : pkce.widget
+        const widgetLabel = widget === 'mail' ? 'Mail LINAGORA' : 'Agenda LINAGORA'
         Alerter.success(`${widgetLabel} connecté`)
         window.history.replaceState({}, '', '/#/')
         navigate('/')
