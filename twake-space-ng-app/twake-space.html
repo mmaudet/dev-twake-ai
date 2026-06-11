@@ -132,8 +132,7 @@
            doublon visuel. .rail-brand est purement décoratif (display:grid
            place-items center), pas de dépendance fonctionnelle ailleurs. -->
       <ul class="rail-apps">
-        <li><button class="rail-app is-active" data-noop aria-label="Espaces" title="Espaces"><svg class="icon"><use href="#i-grid"></use></svg></button></li>
-        <li><button class="rail-app" data-noop aria-label="Drive" title="Drive"><svg class="icon"><use href="#i-folder"></use></svg></button></li>
+        <li><button class="rail-app is-active" data-noop aria-label="Drive" title="Drive"><svg class="icon"><use href="#i-folder"></use></svg></button></li>
         <li><button class="rail-app" data-noop aria-label="Messages" title="Messages"><svg class="icon"><use href="#i-chat"></use></svg></button></li>
         <li><button class="rail-app" data-noop aria-label="Tâches" title="Tâches"><svg class="icon"><use href="#i-check-square"></use></svg></button></li>
         <li><button class="rail-app" data-noop aria-label="Agenda" title="Agenda"><svg class="icon"><use href="#i-calendar"></use></svg></button></li>
@@ -183,7 +182,6 @@
 
       <nav class="nav" aria-label="Espaces">
         <button class="nav-item nav-item--all is-current" data-noop>
-          <svg class="icon"><use href="#i-grid"></use></svg>
           <span>All shared spaces</span>
           <span class="nav-count">12</span>
         </button>
@@ -235,9 +233,10 @@
 
       <!-- En-tête d'espace -->
       <header class="space-header">
-        <button class="hamburger icon-btn" data-action="toggle-sidebar" aria-label="Afficher la navigation" title="Navigation">
-          <svg class="icon"><use href="#i-grid"></use></svg>
-        </button>
+        <!-- Hamburger toggle-sidebar retiré : icône grid faisait doublon
+             avec le rail apps + "All shared spaces". La sidebar reste
+             visible par défaut sur desktop. app.js fait `if (hamburger)`,
+             pas de crash si le bouton est absent. -->
 
         <div class="space-id">
           <span class="space-logo" data-space-logo aria-hidden="true">
