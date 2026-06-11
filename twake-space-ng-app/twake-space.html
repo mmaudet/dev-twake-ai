@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<!--
+  ============================================================================
+  TWAKE SPACE — Maquette HTML statique (Espace Collaboratif Souverain / ECS)
+  Démonstration haute fidélité. Aucune connectivité, aucune persistance.
+  Servi derrière CSP stricte : default-src 'self'; script-src 'self';
+  style-src 'self'; img-src 'self'; object-src 'none'; base-uri 'self'.
+
+  COUVERTURE DES EXIGENCES (EXIGENCES.md) :
+  --------------------------------------------------------------------------
+  E1  Création d'espace .............. Sidebar « + » → modale (nom / type /
+                                       description / note « dépend des droits »)
+  E2  Personnalisation identité ...... Panneau « Personnaliser » : logo,
+                                       couleur d'accent live (--spaceAccent),
+                                       widgets (cases à cocher)
+  E3  Gestion des membres ............ Panneau « Membres » : invitation interne
+                                       ET externe (badge Externe), rôles
+                                       (Administrateur / Contributeur / Lecteur),
+                                       matrice droits par ressource ajustable
+  E4  Documents centralisés .......... Onglet Fichiers : liste (nom/type/
+                                       propriétaire/date/taille), versions (v3 +
+                                       historique), devenir (diffusion externe
+                                       restreinte / modification verrouillée)
+  E5  Gestion des tâches ............. Onglet Tâches : statuts (À faire / En
+                                       cours / Terminé), avancement, assignation,
+                                       échéance, changement de statut interactif
+  E6  Calendrier partagé ............. Onglet Agenda : réunions Twake Visio
+                                       Meeting + lieux (Conference Room A)
+  E7  Fil d'actualité ................ Onglet Fil (défaut) : docs, tâches,
+                                       événements, messages, nouveaux membres
+  E8  Messagerie instantanée ......... Onglet Discussions : canaux, bulles,
+                                       mentions @membre, cartes d'objets liées,
+                                       réactions emoji, badges de rôle
+  E9  Notifications intelligentes .... Cloche + compteur, panneau contextuel,
+                                       arrivée temps réel (setTimeout), marquage
+                                       lu, réglage du niveau d'alerte par type
+  E10 Cycle de vie / archivage ....... Menu « … » → Archiver : bandeau, lecture
+                                       seule, conservation, bouton Réactiver
+  E11 Stockage partagé ............... Fichiers : chemin « Espaces partagés /
+                                       B2B Admin Panel / … » + « synchronisé Drive »
+  E12 IA intégrée .................... Fichiers : classement auto (Rangé par IA),
+                                       métadonnées enrichies + entités nommées,
+                                       recherche plein texte, suggestion de
+                                       regroupement
+  +   Assistant IA d'espace .......... Bouton flottant + panneau conversationnel
+                                       souverain (simulé) : résumé d'activité,
+                                       suivi des tâches, recherche documentaire,
+                                       rédaction — données de l'espace, sans appel
+                                       externe (typing setTimeout + réponses pré-écrites)
+  --------------------------------------------------------------------------
+  Pattern signature : « carte d'objet inter-module » (événement Agenda rendu
+  comme carte dans le Chat et le Fil ; document/tâche idem).
+  ============================================================================
+-->
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Auto-test CSP : politique identique à la cible de production -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; object-src 'none'; base-uri 'self'">
+  <meta name="color-scheme" content="light">
+  <title>Twake Space — B2B Admin Panel</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- ======================================================================
+       SPRITE SVG (inline, même document) — icônes réutilisées via <use>.
+       fill/stroke pilotés en CSS (.icon). Aucune couleur littérale ici.
+       ====================================================================== -->
+  <svg class="sprite" aria-hidden="true" focusable="false" width="0" height="0">
+    <defs>
+      <symbol id="i-feed" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></symbol>
+      <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></symbol>
+      <symbol id="i-check-square" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></symbol>
+      <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+      <symbol id="i-mail" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 7L2 7"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></symbol>
+      <symbol id="i-filter" viewBox="0 0 24 24"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+      <symbol id="i-phone" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.09 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></symbol>
+      <symbol id="i-video" viewBox="0 0 24 24"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></symbol>
+      <symbol id="i-user-plus" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M20 8v6M23 11h-6"/></symbol>
+      <symbol id="i-share" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></symbol>
+      <symbol id="i-more" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></symbol>
+      <symbol id="i-more-h" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></symbol>
+      <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></symbol>
+      <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></symbol>
+      <symbol id="i-doc" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></symbol>
+      <symbol id="i-pin" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></symbol>
+      <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+      <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></symbol>
+      <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 2l9 5-9 5-9-5 9-5zM3 12l9 5 9-5M3 17l9 5 9-5"/></symbol>
+      <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M12 2l1.6 5.4L19 9l-5.4 1.6L12 16l-1.6-5.4L5 9l5.4-1.6L12 2z"/><path d="M19 14l.7 2.3L22 17l-2.3.7L19 20l-.7-2.3L16 17l2.3-.7L19 14z"/></symbol>
+      <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
+      <symbol id="i-send" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></symbol>
+      <symbol id="i-smile" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"/></symbol>
+      <symbol id="i-archive" viewBox="0 0 24 24"><path d="M21 8v13H3V8"/><rect x="1" y="3" width="22" height="5" rx="1"/><path d="M10 12h4"/></symbol>
+      <symbol id="i-close" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+      <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+      <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+      <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></symbol>
+      <symbol id="i-users" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+      <symbol id="i-tag" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><path d="M7 7h.01"/></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></symbol>
+      <symbol id="i-at" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"/></symbol>
+      <symbol id="i-eye" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></symbol>
+      <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></symbol>
+      <symbol id="i-palette" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="8.5" cy="10.5" r="1.2"/><circle cx="12" cy="8" r="1.2"/><circle cx="15.5" cy="10.5" r="1.2"/><path d="M12 22a3 3 0 0 0 0-6 2 2 0 0 1 0-4 4 4 0 0 0 0-8"/></symbol>
+      <symbol id="i-pin-tack" viewBox="0 0 24 24"><path d="M9 4h6l-1 7 4 3v2H6v-2l4-3-1-7zM12 16v6"/></symbol>
+      <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 3v6h6"/><path d="M3.5 9a9 9 0 1 0 2.1-3.4L3 9"/><path d="M12 8v5l4 2"/></symbol>
+      <symbol id="i-paperclip" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></symbol>
+      <symbol id="i-flag" viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7"/></symbol>
+      <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
+      <symbol id="i-globe-fr" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></symbol>
+    </defs>
+  </svg>
+
+  <!-- ======================================================================
+       SHELL : Rail d'apps · Sidebar navigation · Contenu
+       ====================================================================== -->
+  <div class="app" data-app>
+
+    <!-- ---------- 1. RAIL D'APPS (56px) ---------- -->
+    <nav class="rail" aria-label="Applications">
+      <a class="rail-brand" href="#" data-noop aria-label="Twake — accueil">
+        <!-- Logo Twake (assets/twake-logo.svg = icon-cozy-home.svg) inliné tel quel -->
+        <svg class="rail-logo" viewBox="0 0 96 96" width="32" height="32" role="img" aria-label="Twake" focusable="false">
+          <path d="M66.7076 0H29.2924C13.1147 0 0 13.1147 0 29.2924V66.7076C0 82.8852 13.1147 96 29.2924 96H66.7076C82.8852 96 96 82.8852 96 66.7076V29.2924C96 13.1147 82.8852 0 66.7076 0Z" fill="#ffffff"/>
+          <path d="M66.7076 0H29.2924C13.1147 0 0 13.1147 0 29.2924V66.7076C0 82.8852 13.1147 96 29.2924 96H66.7076C82.8852 96 96 82.8852 96 66.7076V29.2924C96 13.1147 82.8852 0 66.7076 0Z" fill="url(#twk0)"/>
+          <path d="M66.7076 0H29.2924C13.1147 0 0 13.1147 0 29.2924V66.7076C0 82.8852 13.1147 96 29.2924 96H66.7076C82.8852 96 96 82.8852 96 66.7076V29.2924C96 13.1147 82.8852 0 66.7076 0Z" fill="url(#twk1)"/>
+          <path d="M66.7076 0H29.2924C13.1147 0 0 13.1147 0 29.2924V66.7076C0 82.8852 13.1147 96 29.2924 96H66.7076C82.8852 96 96 82.8852 96 66.7076V29.2924C96 13.1147 82.8852 0 66.7076 0Z" fill="url(#twk2)"/>
+          <path d="M48.129 14.3055C48.1639 14.331 48.2041 14.3484 48.2467 14.3563C48.2674 14.3563 48.288 14.3658 48.31 14.3674C48.5548 14.3928 48.7919 14.4679 49.0067 14.5881C49.0733 14.6214 49.1369 14.661 49.2022 14.6976L53.9713 17.3957L59.5484 20.5509C60.8975 21.3127 62.2456 22.0756 63.5923 22.8395C63.6766 22.8871 63.7608 22.9315 63.8416 22.9823C64.3587 23.2986 64.7206 23.8163 64.84 24.4107C64.8535 24.4734 64.8613 24.5372 64.8637 24.6012C64.8637 24.7504 64.8748 24.8996 64.8748 25.0504V31.4911C64.8748 33.8937 64.8748 36.2967 64.8748 38.6997C64.8748 38.8282 64.8748 38.9567 64.8748 39.0835C64.8643 39.4275 64.7639 39.7623 64.583 40.0549C64.3124 40.5101 63.8862 40.8514 63.383 41.0151C63.1682 41.0817 62.9457 41.1186 62.7211 41.1246C62.6251 41.124 62.529 41.1158 62.434 41.101C62.1783 41.0729 61.9307 40.9961 61.7038 40.8754C61.6277 40.8358 61.5529 40.7929 61.4799 40.7516L54.3125 36.6968L49.2336 33.8288L48.983 33.6874C48.7821 33.588 48.5684 33.5169 48.3482 33.4764C48.2958 33.4665 48.2427 33.4608 48.1896 33.4588C48.1037 33.4588 48.0181 33.4588 47.9322 33.4588C47.6001 33.4611 47.2737 33.5433 46.9801 33.6986C46.8942 33.7429 46.8117 33.7922 46.7292 33.8399C44.9221 34.8745 43.1147 35.9101 41.3077 36.9457L34.8005 40.6741C34.7085 40.7279 34.6148 40.7803 34.5211 40.8328C34.3145 40.9447 34.0926 41.0255 33.8626 41.0722C33.8206 41.081 33.7782 41.0871 33.7355 41.0898L33.4181 41.0993C33.1174 41.1 32.8206 41.0303 32.5515 40.8964C31.968 40.6315 31.534 40.1188 31.3691 39.4995C31.318 39.3247 31.2913 39.1437 31.2897 38.9615V25.0519C31.2897 24.9662 31.2897 24.8805 31.2897 24.7964C31.2955 24.5287 31.3492 24.2642 31.4485 24.0155C31.6155 23.5955 31.9103 23.2385 32.2912 22.995C32.3626 22.949 32.4388 22.9077 32.5118 22.8649L36.3478 20.6651L40.9076 18.0527L45.5184 15.4165L46.6595 14.7626L46.9101 14.6214C47.0616 14.5388 47.2213 14.4723 47.3863 14.423C47.4908 14.3973 47.5967 14.3787 47.7039 14.3674C47.7458 14.361 47.7851 14.3422 47.8165 14.3135L48.129 14.3055Z" fill="#ffffff"/>
+          <path d="M14.5893 53.4623C14.6534 53.4447 14.6996 53.3889 14.7052 53.3226C14.7217 53.1957 14.7461 53.0703 14.7782 52.9465C14.9155 52.4584 15.2193 52.034 15.6368 51.7465C15.7241 51.6863 15.8177 51.6322 15.9098 51.5879L18.8238 49.9056L25.3167 46.16L27.8418 44.7013C27.9338 44.6488 28.0275 44.5951 28.1227 44.5426C28.4091 44.3955 28.7261 44.3184 29.048 44.317C29.6213 44.3103 30.1742 44.5294 30.5875 44.9268C30.8465 45.1687 31.0394 45.473 31.1478 45.8106C31.2145 46.0027 31.2509 46.2043 31.2557 46.4075C31.2557 46.5249 31.2557 46.6422 31.2557 46.7599V60.3124C31.2557 60.4504 31.2557 60.59 31.2557 60.728C31.269 61.4349 31.6239 62.0914 32.208 62.4898C32.3032 62.5564 32.4079 62.6135 32.5095 62.6707L35.2774 64.218L40.9816 67.4067L44.5146 69.3778C44.6083 69.4302 44.702 69.4813 44.7923 69.5367C45.2796 69.8188 45.6337 70.2848 45.7748 70.83C45.8536 71.108 45.8739 71.3996 45.8333 71.6857C45.7991 71.9397 45.723 72.1863 45.608 72.4156C45.4301 72.7595 45.1619 73.048 44.8318 73.2506C44.7415 73.3078 44.6461 73.3568 44.5525 73.4092L35.3186 78.4881L32.1746 80.2133C32.0905 80.2593 32.0159 80.3084 31.9223 80.3513C31.7798 80.4251 31.6297 80.4829 31.4747 80.5242C31.2573 80.5813 31.0326 80.6053 30.8081 80.5959C30.4431 80.5779 30.0883 80.469 29.7765 80.2783L28.8099 79.7101L15.9701 72.1616C15.8876 72.1142 15.8114 72.0665 15.7225 72.0141C15.2278 71.7077 14.8767 71.2153 14.748 70.6477C14.7242 70.5541 14.7178 70.4573 14.7004 70.3636C14.6921 70.3207 14.662 70.2852 14.6211 70.27C14.6112 70.2659 14.6012 70.2629 14.5909 70.2605L14.5893 53.4623Z" fill="#ffffff"/>
+          <path d="M64.607 80.7024C64.5833 80.6815 64.5573 80.6639 64.5292 80.65C64.4484 80.6216 64.3662 80.5979 64.283 80.5787C64.0848 80.5337 63.894 80.4606 63.7165 80.3612C63.6133 80.304 63.5132 80.2438 63.4118 80.185L58.6677 77.4472L51.6464 73.3984C51.5717 73.3555 51.4973 73.3142 51.4259 73.2682C50.9402 72.9652 50.597 72.4795 50.4735 71.9208C50.4387 71.7754 50.4211 71.6262 50.4211 71.4764C50.395 70.7452 50.7464 70.0519 51.3512 69.6403C51.4394 69.5824 51.5304 69.5293 51.6241 69.4813L55.6268 67.1865L61.023 64.0963L63.5531 62.6474C63.6641 62.5838 63.7767 62.5219 63.8846 62.4536C64.2972 62.1983 64.6121 61.812 64.7798 61.3568C64.838 61.2073 64.8769 61.0511 64.8958 60.8918C64.9148 60.7223 64.9242 60.5515 64.9242 60.3807C64.9242 59.7713 64.9242 59.1635 64.9242 58.5541C64.9242 54.6667 64.9242 50.7799 64.9242 46.8936C64.9242 46.7857 64.9242 46.6791 64.9242 46.576C64.9242 46.4728 64.9242 46.4045 64.9337 46.3206C64.9611 45.812 65.1752 45.3314 65.5354 44.9715C65.8063 44.6952 66.1469 44.497 66.5209 44.3986C66.6853 44.3509 66.8547 44.3239 67.0255 44.3174C67.3796 44.3117 67.7297 44.3918 68.0463 44.5508C68.1318 44.5937 68.216 44.6414 68.2986 44.6905L71.5173 46.5459L77.1783 49.8137L80.1464 51.5264C80.2401 51.5802 80.3321 51.6326 80.4241 51.685C80.8008 51.9143 81.0978 52.2539 81.2747 52.658C81.3085 52.7253 81.3305 52.7977 81.3399 52.8721C81.3521 52.9235 81.3755 52.9719 81.4083 53.0135V70.7049C81.3717 70.7286 81.3481 70.7668 81.343 70.8098C81.3312 70.895 81.3055 70.9775 81.2669 71.0543C81.0944 71.4362 80.8134 71.7588 80.4589 71.9827C80.3703 72.0415 80.2766 72.094 80.1843 72.1413L75.8214 74.6427L66.0955 80.2215C66.0129 80.2692 65.9368 80.3182 65.8448 80.3629C65.668 80.4623 65.4779 80.5357 65.2797 80.58C65.2066 80.5966 65.1346 80.6179 65.0639 80.6436C65.0341 80.6544 65.0088 80.675 64.9925 80.7024H64.607Z" fill="#ffffff"/>
+          <defs>
+            <linearGradient id="twk0" x1="96" y1="55.9999" x2="0" y2="55.9999" gradientUnits="userSpaceOnUse"><stop offset="0.12998" stop-color="#A033FF"/><stop offset="0.610381" stop-color="#0094FF"/><stop offset="1" stop-color="#4FB500"/></linearGradient>
+            <linearGradient id="twk1" x1="43.9998" y1="29.9999" x2="14" y2="89.9998" gradientUnits="userSpaceOnUse"><stop stop-color="#FFD600" stop-opacity="0"/><stop offset="0.563347" stop-color="#FFC700"/></linearGradient>
+            <linearGradient id="twk2" x1="51.9998" y1="55.9999" x2="85.9998" y2="92" gradientUnits="userSpaceOnUse"><stop offset="0.0297327" stop-color="#FF3B30" stop-opacity="0"/><stop offset="0.842824" stop-color="#E73B2D"/></linearGradient>
+          </defs>
+        </svg>
+      </a>
+      <ul class="rail-apps">
+        <li><button class="rail-app is-active" data-noop aria-label="Espaces" title="Espaces"><svg class="icon"><use href="#i-grid"></use></svg></button></li>
+        <li><button class="rail-app" data-noop aria-label="Drive" title="Drive"><svg class="icon"><use href="#i-folder"></use></svg></button></li>
+        <li><button class="rail-app" data-noop aria-label="Messages" title="Messages"><svg class="icon"><use href="#i-chat"></use></svg></button></li>
+        <li><button class="rail-app" data-noop aria-label="Tâches" title="Tâches"><svg class="icon"><use href="#i-check-square"></use></svg></button></li>
+        <li><button class="rail-app" data-noop aria-label="Agenda" title="Agenda"><svg class="icon"><use href="#i-calendar"></use></svg></button></li>
+        <li><button class="rail-app" data-noop aria-label="Mail" title="Mail"><svg class="icon"><use href="#i-mail"></use></svg></button></li>
+        <li><button class="rail-app" data-noop aria-label="Visio" title="Twake Visio Meeting"><svg class="icon"><use href="#i-video"></use></svg></button></li>
+      </ul>
+      <div class="rail-foot">
+        <button class="rail-me-btn" data-open-pop="prefs" aria-label="Préférences et compte" aria-haspopup="dialog" title="Camille Laurent">
+          <svg class="avatar avatar--blue rail-me" viewBox="0 0 40 40" role="img" aria-label="Camille Laurent — vous"><circle class="avatar-bg" cx="20" cy="20" r="20"/><text class="avatar-initials" x="20" y="21">CL</text></svg>
+        </button>
+        <!-- Panneau de préférences utilisateur (simple) -->
+        <div class="prefs-pop" data-pop="prefs" role="dialog" aria-label="Préférences utilisateur" hidden>
+          <div class="prefs-id">
+            <svg class="avatar avatar--blue" viewBox="0 0 40 40" role="img" aria-label="Camille Laurent"><circle class="avatar-bg" cx="20" cy="20" r="20"/><text class="avatar-initials" x="20" y="21">CL</text></svg>
+            <div class="prefs-id-text">
+              <p class="prefs-name">Camille Laurent</p>
+              <p class="muted small">camille.laurent@org.fr</p>
+            </div>
+          </div>
+          <label class="prefs-field">
+            <span class="prefs-field-label">Statut</span>
+            <select class="select" data-noop aria-label="Statut de présence">
+              <option>🟢 Disponible</option>
+              <option>🟠 Occupé</option>
+              <option>⚪ Absent</option>
+            </select>
+          </label>
+          <div class="prefs-rows">
+            <div class="pref-row"><span><svg class="icon"><use href="#i-bell"></use></svg> Notifications</span><button class="toggle is-on" data-toggle aria-pressed="true" aria-label="Activer les notifications"></button></div>
+          </div>
+          <div class="dropdown-sep"></div>
+          <button class="dropdown-item" data-noop><svg class="icon"><use href="#i-sliders"></use></svg> Paramètres du compte</button>
+          <button class="dropdown-item dropdown-item--danger" data-action="logout"><svg class="icon"><use href="#i-logout"></use></svg> Se déconnecter</button>
+        </div>
+      </div>
+    </nav>
+
+    <!-- ---------- 2. SIDEBAR NAVIGATION (240px) ---------- -->
+    <aside class="sidebar" data-sidebar aria-label="Navigation des espaces">
+      <header class="sidebar-head">
+        <h1 class="sidebar-title">Project</h1>
+        <div class="sidebar-head-actions">
+          <button class="icon-btn" data-noop aria-label="Filtrer les espaces" title="Filtrer"><svg class="icon"><use href="#i-filter"></use></svg></button>
+          <button class="icon-btn" data-open="create-space" aria-label="Créer un espace" title="Créer un espace"><svg class="icon"><use href="#i-plus"></use></svg></button>
+        </div>
+      </header>
+
+      <nav class="nav" aria-label="Espaces">
+        <button class="nav-item nav-item--all is-current" data-noop>
+          <svg class="icon"><use href="#i-grid"></use></svg>
+          <span>All shared spaces</span>
+          <span class="nav-count">12</span>
+        </button>
+
+        <p class="nav-section" id="sec-pinned">Pinned</p>
+        <ul class="nav-list" aria-labelledby="sec-pinned">
+          <li>
+            <button class="nav-space is-active" data-space="b2b">
+              <span class="space-mini space-mini--grad" aria-hidden="true"></span>
+              <span class="nav-space-name">B2B Admin Panel</span>
+              <svg class="icon nav-pin"><use href="#i-pin-tack"></use></svg>
+            </button>
+          </li>
+          <li>
+            <button class="nav-space" data-space="modsi">
+              <span class="space-mini space-mini--teal" aria-hidden="true"></span>
+              <span class="nav-space-name">Modernisation du SI</span>
+            </button>
+          </li>
+        </ul>
+
+        <p class="nav-section" id="sec-recent">Recently opened</p>
+        <ul class="nav-list" aria-labelledby="sec-recent">
+          <li><button class="nav-space" data-space="equip"><span class="space-mini space-mini--amber" aria-hidden="true"></span><span class="nav-space-name">Équipements utilisateurs</span></button></li>
+          <li><button class="nav-space" data-space="cyber"><span class="space-mini space-mini--violet" aria-hidden="true"></span><span class="nav-space-name">Cybersécurité</span></button></li>
+          <li><button class="nav-space" data-space="collab"><span class="space-mini space-mini--green" aria-hidden="true"></span><span class="nav-space-name">Plateforme collaborative</span></button></li>
+        </ul>
+      </nav>
+
+      <div class="sidebar-foot">
+        <button class="btn btn-secondary btn-block" data-open="create-space">
+          <svg class="icon"><use href="#i-plus"></use></svg> Nouvel espace
+        </button>
+      </div>
+    </aside>
+
+    <!-- ---------- 3. CONTENU ---------- -->
+    <main class="content" data-space-root>
+
+      <!-- Bandeau « Archivé » (E10) — masqué par défaut -->
+      <div class="archive-banner" data-archive-banner hidden role="status">
+        <svg class="icon"><use href="#i-archive"></use></svg>
+        <div class="archive-banner-text">
+          <strong>Espace archivé.</strong>
+          Contenu en lecture seule — documents, échanges et historiques sont conservés.
+        </div>
+        <button class="btn btn-primary btn-sm" data-action="reactivate">Réactiver l'espace</button>
+      </div>
+
+      <!-- En-tête d'espace -->
+      <header class="space-header">
+        <button class="hamburger icon-btn" data-action="toggle-sidebar" aria-label="Afficher la navigation" title="Navigation">
+          <svg class="icon"><use href="#i-grid"></use></svg>
+        </button>
+
+        <div class="space-id">
+          <span class="space-logo" data-space-logo aria-hidden="true">
+            <svg class="cube" viewBox="0 0 24 24" width="28" height="28" focusable="false">
+              <path d="M0 7.93C0 3.55 3.55 0 7.93 0H16.07C20.45 0 24 3.55 24 7.93V16.07C24 20.45 20.45 24 16.07 24H7.93C3.55 24 0 20.45 0 16.07V7.93Z" fill="url(#cubeGrad)"/>
+              <use href="#cube-mark"></use>
+            </svg>
+          </span>
+          <div class="space-id-text">
+            <h2 class="space-name">B2B Admin Panel</h2>
+            <p class="space-sub"><span class="dot-live" aria-hidden="true"></span> Espace partagé · 7 membres</p>
+          </div>
+        </div>
+
+        <div class="space-actions">
+          <div class="search">
+            <svg class="icon search-icon"><use href="#i-search"></use></svg>
+            <input class="search-input" type="search" placeholder="Rechercher dans l'espace…" aria-label="Recherche globale" data-input="search">
+          </div>
+          <button class="icon-btn" data-noop aria-label="Appel audio" title="Appel"><svg class="icon"><use href="#i-phone"></use></svg></button>
+          <button class="icon-btn" data-noop aria-label="Démarrer une visio" title="Twake Visio Meeting"><svg class="icon"><use href="#i-video"></use></svg></button>
+          <button class="icon-btn" data-open="members" aria-label="Membres et invitations" title="Membres"><svg class="icon"><use href="#i-user-plus"></use></svg></button>
+          <button class="icon-btn" data-noop aria-label="Lien de partage" title="Partager"><svg class="icon"><use href="#i-share"></use></svg></button>
+          <button class="icon-btn bell" data-open="notifications" aria-label="Notifications" title="Notifications">
+            <svg class="icon"><use href="#i-bell"></use></svg>
+            <span class="bell-badge" data-bell-badge>3</span>
+          </button>
+          <div class="menu-anchor">
+            <button class="icon-btn" data-open="space-menu" aria-label="Menu de l'espace" aria-haspopup="true" title="Plus d'options"><svg class="icon"><use href="#i-more"></use></svg></button>
+            <!-- Menu « … » de l'espace (E2/E10) -->
+            <div class="dropdown" data-menu="space-menu" role="menu" hidden>
+              <button class="dropdown-item" role="menuitem" data-open="customize"><svg class="icon"><use href="#i-sliders"></use></svg> Personnaliser l'espace</button>
+              <button class="dropdown-item" role="menuitem" data-open="members"><svg class="icon"><use href="#i-users"></use></svg> Gérer les membres</button>
+              <button class="dropdown-item" role="menuitem" data-noop><svg class="icon"><use href="#i-bell"></use></svg> Préférences de notification</button>
+              <div class="dropdown-sep"></div>
+              <button class="dropdown-item dropdown-item--danger" role="menuitem" data-action="archive"><svg class="icon"><use href="#i-archive"></use></svg> Archiver l'espace</button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Barre d'onglets -->
+      <div class="tabs-wrap">
+        <div class="tabs" role="tablist" aria-label="Vues de l'espace">
+          <button class="tab is-active" role="tab" id="tab-feed" aria-controls="panel-feed" aria-selected="true" data-tab="feed">
+            <svg class="icon"><use href="#i-feed"></use></svg> Fil
+          </button>
+          <button class="tab" role="tab" id="tab-chat" aria-controls="panel-chat" aria-selected="false" tabindex="-1" data-tab="chat">
+            <svg class="icon"><use href="#i-chat"></use></svg> Discussions <span class="tab-count">5</span>
+          </button>
+          <button class="tab" role="tab" id="tab-files" aria-controls="panel-files" aria-selected="false" tabindex="-1" data-tab="files">
+            <svg class="icon"><use href="#i-folder"></use></svg> Fichiers
+          </button>
+          <button class="tab" role="tab" id="tab-tasks" aria-controls="panel-tasks" aria-selected="false" tabindex="-1" data-tab="tasks">
+            <svg class="icon"><use href="#i-check-square"></use></svg> Tâches
+          </button>
+          <button class="tab" role="tab" id="tab-agenda" aria-controls="panel-agenda" aria-selected="false" tabindex="-1" data-tab="agenda">
+            <svg class="icon"><use href="#i-calendar"></use></svg> Agenda <span class="tab-count">2</span>
+          </button>
+          <button class="tab" role="tab" id="tab-mail" aria-controls="panel-mail" aria-selected="false" tabindex="-1" data-tab="mail">
+            <svg class="icon"><use href="#i-mail"></use></svg> Mail
+          </button>
+        </div>
+      </div>
+
+      <!-- Zone défilante des panneaux -->
+      <div class="panels" data-panels>
+
+        <!-- ============ PANNEAU FIL (E7) ============ -->
+        <section class="panel is-active" role="tabpanel" id="panel-feed" aria-labelledby="tab-feed" data-panel="feed" tabindex="0">
+          <div class="panel-inner feed">
+            <div class="section-head">
+              <h3 class="section-title">Fil d'actualité</h3>
+              <span class="muted">Toute l'activité de l'espace, agrégée en temps réel</span>
+            </div>
+
+            <ol class="feed-list" data-searchable-list>
+              <li class="feed-item" data-searchable="document cahier des charges camille laurent">
+                <span class="feed-bullet feed-bullet--doc" aria-hidden="true"><svg class="icon"><use href="#i-doc"></use></svg></span>
+                <div class="feed-body">
+                  <p class="feed-line"><strong>Camille Laurent</strong> a ajouté un document <span class="feed-when">· il y a 12 min</span></p>
+                  <!-- Carte d'objet inter-module : DOCUMENT -->
+                  <article class="ocard">
+                    <span class="ocard-accent" aria-hidden="true"></span>
+                    <span class="ocard-ico" aria-hidden="true"><svg class="icon"><use href="#i-doc"></use></svg></span>
+                    <div class="ocard-main">
+                      <h4 class="ocard-title">Cahier des charges B2B v3.pdf</h4>
+                      <p class="ocard-meta"><span class="badge badge-version"><svg class="icon"><use href="#i-layers"></use></svg> v3</span> <span class="badge badge-warn"><svg class="icon"><use href="#i-globe"></use></svg> Diffusion externe restreinte</span></p>
+                    </div>
+                    <button class="icon-btn ocard-more" data-noop aria-label="Options"><svg class="icon"><use href="#i-more-h"></use></svg></button>
+                  </article>
+                </div>
+              </li>
+
+              <li class="feed-item" data-searchable="tâche sso keycloak thomas moreau en cours">
+                <span class="feed-bullet feed-bullet--task" aria-hidden="true"><svg class="icon"><use href="#i-check-square"></use></svg></span>
+                <div class="feed-body">
+                  <p class="feed-line"><strong>Thomas Moreau</strong> a créé une tâche <span class="feed-when">· il y a 38 min</span></p>
+                  <!-- Carte d'objet inter-module : TÂCHE -->
+                  <article class="ocard">
+                    <span class="ocard-accent" aria-hidden="true"></span>
+                    <span class="ocard-ico" aria-hidden="true"><svg class="icon"><use href="#i-check-square"></use></svg></span>
+                    <div class="ocard-main">
+                      <h4 class="ocard-title">Intégrer le SSO Keycloak</h4>
+                      <p class="ocard-meta"><span class="chip-status chip-status--doing"><span class="chip-dot"></span> En cours</span> · échéance 18 juin · <span class="assignee"><svg class="avatar avatar--teal avatar-xs" viewBox="0 0 40 40" role="img" aria-label="Thomas Moreau"><circle class="avatar-bg" cx="20" cy="20" r="20"/><text class="avatar-initials" x="20" y="21">TM</text></svg> Thomas</span></p>
+                    </div>
+                    <button class="icon-btn ocard-more" data-noop aria-label="Options"><svg class="icon"><use href="#i-more-h"></use></svg></button>
+                  </article>
+                </div>
+              </li>
+
+              <li class="feed-item" data-searchable="événement comité de pilotage copil visio sophie dubois">
+                <span class="feed-bullet feed-bullet--event" aria-hidden="true"><svg class="icon"><use href="#i-calendar"></use></svg></span>
+                <div class="feed-body">
+                  <p class="feed-line"><strong>Sophie Dubois</strong> a planifié un événement <span class="feed-when">· il y a 1 h</span></p>
+                  <!-- Carte d'objet inter-module : ÉVÉNEMENT AGENDA -->
+                  <article class="ocard ocard--event">
+                    <span class="ocard-accent" aria-hidden="true"></span>
+                    <div class="ocard-date" aria-hidden="true"><span class="ocard-day">11</span><span class="ocard-mon">JUIN</span></div>
+                    <div class="ocard-main">
+                      <h4 class="ocard-title">Comité de pilotage</h4>
+                      <p class="ocard-meta"><svg class="icon"><use href="#i-clock"></use></svg> 14:00 – 15:00 · <svg class="icon"><use href="#i-video"></use></svg> Twake Visio Meeting</p>
+                    </div>
+                    <button class="icon-btn ocard-more" data-noop aria-label="Options"><svg class="icon"><use href="#i-more-h"></use></svg></button>
+                  </article>
+                </div>
+              </li>
+
+              <li class="feed-item" data-searchable="message important léa rousseau général">
+                <span class="feed-bullet feed-bullet--msg" aria-hidden="true"><svg class="icon"><use href="#i-chat"></use></svg></span>
+                <div class="feed-body">
+                  <p class="feed-line"><strong>Léa Rousseau</strong> a publié un message important dans <a class="link" href="#" data-tab-link="chat">#général</a> <span class="feed-when">· il y a 2 h</span></p>
+                  <blockquote class="feed-quote">« La nouvelle charte graphique est validée par le client, on peut lancer l'intégration. »</blockquote>
+                </div>
+              </li>
+
+              <li class="feed-item" data-searchable="nouveau membre nadia el amrani externe">
+                <span class="feed-bullet feed-bullet--member" aria-hidden="true"><svg class="icon"><use href="#i-user-plus"></use></svg></span>
+                <div class="feed-body">
+                  <p class="feed-line"><strong>Nadia El Amrani</strong> <span class="badge badge-ext">Externe</span> a rejoint l'espace <span class="feed-when">· il y a 3 h</span></p>
+                  <p class="muted small">Invitée par Camille Laurent · rôle Contributeur</p>
+                </div>
+              </li>
+
+              <li class="feed-item" data-searchable="budget verrouillé marc lefèvre modification">
+                <span class="feed-bullet feed-bullet--lock" aria-hidden="true"><svg class="icon"><use href="#i-lock"></use></svg></span>
+                <div class="feed-body">
+                  <p class="feed-line"><strong>Marc Lefèvre</strong> a verrouillé la modification d'un document <span class="feed-when">· il y a 5 h</span></p>
+                  <article class="ocard">
+                    <span class="ocard-accent" aria-hidden="true"></span>
+                    <span class="ocard-ico" aria-hidden="true"><svg class="icon"><use href="#i-doc"></use></svg></span>
+                    <div class="ocard-main">
+                      <h4 class="ocard-title">Budget prévisionnel 2026.xlsx</h4>
+                      <p class="ocard-meta"><span class="badge badge-lock"><svg class="icon"><use href="#i-lock"></use></svg> Modification verrouillée</span></p>
+                    </div>
+                  </article>
+                </div>
+              </li>
+            </ol>
+          </div>
+        </section>
+
+        <!-- ============ PANNEAU DISCUSSIONS (E8) ============ -->
+        <section class="panel" role="tabpanel" id="panel-chat" aria-labelledby="tab-chat" data-panel="chat" tabindex="0" hidden>
+          <div class="chat">
+            <!-- Liste des canaux propres à l'espace -->
+            <div class="channels" aria-label="Canaux">
+              <p class="nav-section">Canaux</p>
+              <button class="channel is-active" data-channel="general"># général <span class="channel-badge">3</span></button>
+              <button class="channel" data-channel="projet"># projet-b2b</button>
+              <button class="channel" data-channel="design"># design</button>
+              <button class="channel" data-channel="incidents"># incidents <span class="channel-badge channel-badge--alert">2</span></button>
+              <button class="channel" data-channel="externe"># partenaires-externes</button>
+              <p class="nav-section">Messages directs</p>
+              <button class="channel channel--dm" data-noop><svg class="avatar avatar--teal avatar-xs" viewBox="0 0 40 40" role="img" aria-label="Thomas Moreau"><circle class="avatar-bg" cx="20" cy="20" r="20"/><text class="avatar-initials" x="20" y="21">TM</text></svg> Thomas Moreau</button>
+              <button class="channel channel--dm" data-noop><svg class="avatar avatar--violet avatar-xs" viewBox="0 0 40 40" role="img" aria-label="Sophie Dubois"><circle class="avatar-bg" cx="20" cy="20" r="20"/><text class="avatar-initials" x="20" y="21">SD</text></svg> Sophie Dubois</button>
+            </div>
+
+            <!-- Fil de messages -->
+            <div class="thread">
+              <div class="thread-head">
+                <h3 class="thread-title"># général</h3>
+                <span class="muted small">Canal de l'espace B2B Admin Panel · 7 membres</span>
+              </div>
+
+              <div class="messages" data-messages>
+                <!-- Message reçu + badge Owner -->
+                <div class="msg">
+                  <svg class="avatar avatar--blue" viewBox="0 0 40 40" role="img" aria-label="Camille Laurent"><circle class="avatar-bg" cx="20" cy="20" r="20"/><text class="avatar-initials" x="20" y="21">CL</text></svg>
+                  <div class="msg-body">
+                    <p class="msg-head"><span class="msg-name">Camille Laurent</span> <span class="badge badge-role">Owner</span> <span class="msg-time">09:24</span></p>
+                    <div class="bubble">Bonjour à tous 👋 On démarre le sprint d'intégration B2B aujourd'hui. <span class="mention">@Thomas Moreau</span> peux-tu prendre le sujet SSO&nbsp;?</div>
+                    <div class="reactions">
+                      <button class="reaction" data-reaction aria-label="Réagir 👍"><span class="reaction-emoji">👍</span> <span class="reaction-count">3</span></button>
+                      <button class="reaction" data-reaction aria-label="Réagir 🚀"><span class="reaction-emoji">🚀</span> <span class="reaction-count">2</span></button>
+                      <button class="reaction reaction--add" data-noop aria-label="Ajouter une réaction"><svg class="icon"><use href="#i-smile"></use></svg></button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Message reçu + carte d'objet TÂCHE liée (interop + E8 lier) -->
+                <div class="msg">
+                  <svg class="avatar avatar--teal" viewBox="0 0 40 40" role="img" aria-label="Thomas Moreau"><circle class="avatar-bg" cx="20" cy="20" r="20"/><text class="avatar-initials" x="20" y="21">TM</text></svg>
+                  <div class="msg-body">
+                    <p class="msg-head"><span class="msg-name">Thomas Moreau</span> <span class="badge badge-role">Administrateur</span> <span class="msg-time">09:31</span></p>
+                    <div class="bubble">C'est noté, je m'en occupe. Je rattache la tâche ici 👇</div>
+                    <article class="ocard ocard--inchat">
+                      <span class="ocard-accent" aria-hidden="true"></span>
+                      <span class="ocard-ico" aria-hidden="true"><svg class="icon"><use href="#i-check-square"></use></svg></span>
+                      <div class="ocard-main">
+                        <h4 class="ocard-title">Intégrer le SSO Keycloak</h4>
+                        <p class="ocard-meta"><span class="chip-status chip-status--doing"><span class="chip-dot"></span> En cours</span> · échéance 18 juin</p>
+                      </div>
+                      <span class="ocard-tag"><svg class="icon"><use href="#i-link"></use></svg> Tâche liée</span>
+                    </article>
+                    <div class="reactions">
+                      <button class="reaction" data-reaction aria-label="Réagir 👍"><span class="reaction-emoji">👍</span> <span class="reaction-count">1</span></button>
+                      <button class="reaction reaction--add" data-noop aria-label="Ajouter une réaction"><svg class="icon"><use href="#i-smile"></use></svg></button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Message reçu + carte d'objet ÉVÉNEMENT (interop signature) -->
+                <div class="msg">
+                  <svg class="avatar avatar--violet" viewBox="0 0 40 40" role="img" aria-label="Sophie Dubois"><circle class="avatar-bg" cx="20" cy="20" r="20"/><text class="avatar-initials" x="20" y="21">SD</text></svg>
+                  <div class="msg-body">
+                    <p class="msg-head"><span class="msg-name">Sophie Dubois</span> <span class="badge badge-role">Contributeur</span> <span class="msg-time">09:40</span></p>
+                    <div class="bubble">J'ai calé le COPIL pour faire le point. Détails 👇</div>
+                    <article class="ocard ocard--event ocard--inchat">
+                      <span class="ocard-accent" aria-hidden="true"></span>
+                      <div class="ocard-date" aria-hidden="true"><span class="ocard-day">11</span><span class="ocard-mon">JUIN</span></div>
+                      <div class="ocard-main">
+                        <h4 class="ocard-title">Comité de pilotage</h4>
+                        <p class="ocard-meta"><svg class="icon"><use href="#i-clock"></use></svg> 14:00 · <svg class="icon"><use href="#i-video"></use></svg> Twake Visio Meeting</p>
+                      </div>
+                      <span class="ocard-tag"><svg class="icon"><use href="#i-link"></use></svg> Événement lié</span>
+                    </article>
+                  </div>
+                </div>
+
+                <!-- Message reçu : mention + doc lié -->
+                <div class="msg">
+                  <svg class="avatar avatar--green" viewBox="0 0 40 40" role="img" aria-label="Léa Rousseau"><circle class="avatar-bg" cx="20" cy="20" r="20"/><text class="avatar-initials" x="20" y="21">LR</text></svg>
+                  <div class="msg-body">
+                    <p class="msg-head"><span class="msg-name">Léa Rousseau</span> <span class="badge badge-role">Contributeur</span> <span class="msg-time">10:02</span></p>
+                    <div class="bubble"><span class="mention">@Camille Laurent</span> la charte est prête, je l'ai déposée dans Fichiers ✅</div>
+                    <article class="ocard ocard--inchat">
+                      <span class="ocard-accent" aria-hidden="true"></span>
+                      <span class="ocard-ico" aria-hidden="true"><svg class="icon"><use href="#i-doc"></use></svg></span>
+                      <div class="ocard-main">
+                        <h4 class="ocard-title">Charte graphique.pdf</h4>
+                        <p class="ocard-meta"><span class="badge badge-version"><svg class="icon"><use href="#i-layers"></use></svg> v2</span> · 3,1 Mo</p>
+                      </div>
+                      <span class="ocard-tag"><svg class="icon"><use href="#i-link"></use></svg> Document lié</span>
+                    </article>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Saisie -->
+              <form class="composer" data-composer>
+                <button type="button" class="icon-btn" data-action="link-object" aria-label="Lier un objet" title="Lier une tâche, un document ou un événement"><svg class="icon"><use href="#i-paperclip"></use></svg></button>
+                <input class="composer-input" type="text" placeholder="Envoyer un message à #général…" aria-label="Votre message" data-input="message">
+                <button type="button" class="icon-btn" data-noop aria-label="Emoji"><svg class="icon"><use href="#i-smile"></use></svg></button>
+                <button type="submit" class="btn btn-primary composer-send" data-action="send" aria-label="Envoyer"><svg class="icon"><use href="#i-send"></use></svg></button>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ PANNEAU FICHIERS (E4 / E11 / E12) ============ -->
+        <section class="panel" role="tabpanel" id="panel-files" aria-labelledby="tab-files" data-panel="files" tabindex="0" hidden>
+          <div class="panel-inner files">
+
+            <!-- E11 : intégration au stockage partagé -->
+            <nav class="breadcrumb" aria-label="Emplacement">
+              <svg class="icon"><use href="#i-folder"></use></svg>
+              <span>Espaces partagés</span> <svg class="icon bc-sep"><use href="#i-chevron-right"></use></svg>
+              <span>B2B Admin Panel</span> <svg class="icon bc-sep"><use href="#i-chevron-right"></use></svg>
+              <span class="bc-current">Documents</span>
+              <span class="badge badge-sync"><svg class="icon"><use href="#i-layers"></use></svg> Synchronisé avec le Drive partagé</span>
+            </nav>
+
+            <!-- E12 : recherche plein texte -->
+            <div class="files-search">
+              <div class="search search--inline">
+                <svg class="icon search-icon"><use href="#i-search"></use></svg>
+                <input class="search-input" type="search" placeholder="Recherche plein texte dans les documents…" aria-label="Recherche plein texte" data-input="files-search">
+              </div>
+              <span class="ai-tag"><svg class="icon"><use href="#i-sparkles"></use></svg> Recherche plein texte IA</span>
+            </div>
+            <p class="files-search-hint" data-files-hint hidden></p>
+
+            <!-- E12 : suggestion de regroupement par l'IA -->
+            <div class="ai-suggest" data-ai-suggest>
+              <span class="ai-suggest-ico" aria-hidden="true"><svg class="icon"><use href="#i-sparkles"></use></svg></span>
+              <div class="ai-suggest-body">
+                <p class="ai-suggest-title">L'IA suggère de regrouper 3 documents</p>
+                <p class="ai-suggest-text">« Cahier des charges B2B », « Specs techniques API » et « Maquettes UI » partagent la thématique <em>Conception B2B</em>.</p>
+              </div>
+              <div class="ai-suggest-actions">
+                <button class="btn btn-primary btn-sm" data-action="ai-group-apply">Regrouper</button>
+                <button class="btn btn-ghost btn-sm" data-action="ai-group-dismiss">Ignorer</button>
+              </div>
+            </div>
+
+            <!-- Liste des documents -->
+            <div class="files-table" role="table" aria-label="Documents de l'espace">
+              <div class="files-row files-row--head" role="row">
+                <span role="columnheader">Nom</span>
+                <span role="columnheader">Propriétaire</span>
+                <span role="columnheader">Modifié</span>
+                <span role="columnheader">Taille</span>
+                <span role="columnheader" class="col-end">Statut</span>
+              </div>
+
+              <ul class="files-body" data-searchable-list>
+                <!-- Document détaillé (E4 versions / E12 métadonnées + entités) -->
+                <li class="file-wrap" data-searchable="cahier des charges b2b pdf camille laurent rgpd keycloak conception">
+                  <div class="files-row" role="row">
+                    <span class="file-name" role="cell">
+                      <svg class="icon file-ico file-ico--pdf"><use href="#i-doc"></use></svg>
+                      <span>
+                        Cahier des charges B2B v3.pdf
+                        <span class="file-badges">
+                          <span class="badge badge-version" data-open="versions"><svg class="icon"><use href="#i-layers"></use></svg> v3</span>
+                          <span class="badge badge-warn"><svg class="icon"><use href="#i-globe"></use></svg> Diffusion externe restreinte</span>
+                          <span class="badge badge-ai"><svg class="icon"><use href="#i-sparkles"></use></svg> Rangé par IA</span>
+                        </span>
+                      </span>
+                    </span>
+                    <span class="file-owner" role="cell"><svg class="avatar avatar--blue avatar-xs" viewBox="0 0 40 40" role="img" aria-label="Camille Laurent"><circle class="avatar-bg" cx="20" cy="20" r="20"/><text class="avatar-initials" x="20" y="21">CL</text></svg> Camille L.</span>
+                    <span role="cell" class="muted">11 juin</span>
+                    <span role="cell" class="muted">2,4 Mo</span>
+                    <span class="col-end" role="cell">
+                      <button class="link-btn" data-action="toggle-file-detail" aria-expanded="false"><svg class="icon"><use href="#i-sparkles"></use></svg> Détails IA</button>
+                    </span>
+                  </div>
+
+                  <!-- E12 : fiche métadonnées enrichies + entités nommées -->
+                  <div class="file-detail" data-file-detail hidden>
+                    <div class="file-detail-grid">
+                      <div class="meta-block">
+                        <p class="meta-label">Auteur</p><p class="meta-value">Camille Laurent</p>
+                      </div>
+                      <div class="meta-block">
+                        <p class="meta-label">Date</p><p class="meta-value">11 juin 2026</p>
+                      </div>
+                      <div class="meta-block">
+                        <p class="meta-label">Thématique <span class="ai-mini">IA</span></p><p class="meta-value">Conception B2B · Cadrage</p>
+                      </div>
+                      <div class="meta-block meta-block--wide">
+                        <p class="meta-label">Entités nommées <span class="ai-mini">IA</span></p>
+                        <p class="meta-value entities">
+                          <span class="entity">Keycloak</span><span class="entity">RGPD</span><span class="entity">SSO</span><span class="entity">Camille Laurent</span><span class="entity">B2B Admin Panel</span>
+                        </p>
+                      </div>
+                    </div>
+                    <!-- E4 : historique des versions (panneau déroulant simulé) -->
+                    <div class="versions" data-versions hidden>
+                      <p class="versions-title"><svg class="icon"><use href="#i-history"></use></svg> Historique des versions</p>
+                      <ul class="versions-list">
+                        <li><span class="badge badge-version">v3</span> 11 juin · Camille Laurent · <span class="muted">version actuelle</span></li>
+                        <li><span class="badge badge-version badge-version--old">v2</span> 6 juin · Thomas Moreau · ajout chapitre sécurité</li>
+                        <li><span class="badge badge-version badge-version--old">v1</span> 2 juin · Camille Laurent · création</li>
+                      </ul>
+                    </div>
+                    <button class="link-btn" data-action="toggle-versions" aria-expanded="false"><svg class="icon"><use href="#i-history"></use></svg> Voir l'historique des versions</button>
+                  </div>
+                </li>
+
+                <li class="file-wrap" data-searchable="budget prévisionnel 2026 xlsx marc lefèvre finance verrouillé">
+                  <div class="files-row" role="row">
+                    <span class="file-name" role="cell">
+                      <svg class="icon file-ico file-ico--xls"><use href="#i-doc"></use></svg>
+                      <span>Budget prévisionnel 2026.xlsx
+                        <span class="file-badges"><span class="badge badge-lock"><svg class="icon"><use href="#i-lock"></use></svg> Modification verrouillée</span></span>
+                      </span>
+                    </span>
+                    <span class="file-owner" role="cell"><svg class="avatar avatar--primary avatar-xs" viewBox="0 0 40 40" role="img" aria-label="Marc Lefèvre"><circle class="avatar-bg" cx="20" cy="20" r="20"/><text class="avatar-initials" x="20" y="21">ML</text></svg> Marc L.</span>
+                    <span role="cell" class="muted">10 juin</span>
+                    <span role="cell" class="muted">847 Ko</span>
+                    <span class="col-end" role="cell"><button class="icon-btn" data-noop aria-label="Télécharger"><svg class="icon"><use href="#i-download"></use></svg></button></span>
+                  </div>
+                </li>
+
+                <li class="file-wrap" data-searchable="specs techniques api docx thomas moreau développement conception">
+                  <div class="files-row" role="row">
+                    <span class="file-name" role="cell">
+                      <svg class="icon file-ico file-ico--doc"><use href="#i-doc"></use></svg>
+                      <span>Specs techniques API.docx
+                        <span class="file-badges"><span class="badge badge-version"><svg class="icon"><use href="#i-layers"></use></svg> v5</span> <span class="badge badge-ai"><svg class="icon"><use href="#i-sparkles"></use></svg> Rangé par IA</span></span>
+                      </span>
+                    </span>
+                    <span class="file-owner" role="cell"><svg class="avatar avatar--teal avatar-xs" viewBox="0 0 40 40" role="img" aria-label="Thomas Moreau"><circle class="avatar-bg" cx="20" cy="20" r="20"/><text class="avatar-initials" x="20" y="21">TM</text></svg> Thomas M.</span>
+                    <span role="cell" class="muted">9 juin</span>
+                    <span role="cell" class="muted">512 Ko</span>
+                    <span class="col-end" role="cell"><button class="icon-btn" data-noop aria-label="Télécharger"><svg class="icon"><use href="#i-download"></use></svg></button></span>
+                  </div>
+                </li>
+
+                <li class="file-wrap" data-searchable="maquettes ui fig léa rousseau design conception">
+                  <div class="files-row" role="row">
+                    <span class="file-name" role="cell">
+                      <svg class="icon file-ico file-ico--fig"><use href="#i-doc"></use></svg>
+                      <span>Maquettes UI.fig
+                        <span class="file-badges"><span class="badge badge-ai"><svg class="icon"><use href="#i-sparkles"></use></svg> Rangé par IA</span></span>
+                      </span>
+                    </span>
+                    <span class="file-owner" role="cell"><svg class="avatar avatar--green avatar-xs" viewBox="0 0 40 40" role="img" aria-label="Léa Rousseau"><circle class="avatar-bg" cx="20" cy="20" r="20"/><text class="avatar-initials" x="20" y="21">LR</text></svg> Léa R.</span>
+                    <span role="cell" class="muted">8 juin</span>
+                    <span role="cell" class="muted">14 Mo</span>
+                    <span class="col-end" role="cell"><button class="icon-btn" data-noop aria-label="Télécharger"><svg class="icon"><use href="#i-download"></use></svg></button></span>
+                  </div>
+                </li>
+
+                <li class="file-wrap" data-searchable="compte-rendu copil pdf sophie dubois réunion">
+                  <div class="files-row" role="row">
+                    <span class="file-name" role="cell">
+                      <svg class="icon file-ico file-ico--pdf"><use href="#i-doc"></use></svg>
+                      <span>Compte-rendu COPIL.pdf</span>
+                    </span>
+                    <span class="file-owner" role="cell"><svg class="avatar avatar--violet avatar-xs" viewBox="0 0 40 40" role="img" aria-label="Sophie Dubois"><circle class="avatar-bg" cx="20" cy="20" r="20"/><text class="avatar-initials" x="20" y="21">SD</text></svg> Sophie D.</span>
+                    <span role="cell" class="muted">5 juin</span>
+                    <span role="cell" class="muted">320 Ko</span>
+                    <span class="col-end" role="cell"><button class="icon-btn" data-noop aria-label="Télécharger"><svg class="icon"><use href="#i-download"></use></svg></button></span>
+                  </div>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ PANNEAU TÂCHES (E5) ============ -->
+        <section class="panel" role="tabpanel" id="panel-tasks" aria-labelledby="tab-tasks" data-panel="tasks" tabindex="0" hidden>
+          <div class="panel-inner tasks">
+            <div class="section-head">
+              <h3 class="section-title">Tâches</h3>
+              <span class="muted">Cliquez sur le statut d'une carte pour le faire évoluer</span>
+            </div>
+
+            <!-- Avancement global de l'espace -->
+            <div class="progress-card">
+              <div class="progress-head">
+                <span>Avancement de l'espace</span>
+                <strong data-progress-label>33 %</strong>
+              </div>
+              <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="33" aria-label="Avancement de l'espace">
+                <div class="progress-fill" data-progress-fill></div>
+              </div>
+              <p class="muted small"><span data-progress-count>2</span> tâches terminées sur 6</p>
+            </div>
+
+            <!-- Tableau 3 colonnes -->
+            <div class="board" data-board>
+              <div class="board-col" data-col="todo">
+                <p class="board-col-head"><span class="chip-dot chip-dot--todo"></span> À faire <span class="board-col-count" data-count="todo">2</span></p>
+                <div class="board-col-body" data-searchable-list>
+                  <article class="task-card" data-task data-status="todo" data-searchable="rédiger spécifications api sophie dubois">
+                    <p class="task-title">Rédiger les spécifications fonctionnelles de l'API</p>
+                    <div class="task-foot">
+                      <button class="chip-status chip-status--todo" data-action="cycle-status" aria-label="Changer le statut : actuellement À faire"><span class="chip-dot"></span> À faire</button>
+                      <span class="task-meta"><svg class="icon"><use href="#i-clock"></use></svg> 14 juin <svg class="avatar avatar--violet avatar-xs" viewBox="0 0 40 40" role="img" aria-label="Assigné à Sophie Dubois"><circle class="avatar-bg" cx="20" cy="20" r="20"/><text class="avatar-initials" x="20" y="21">SD</text></svg></span>
+                    </div>
+                  </article>
+                  <article class="task-card" data-task data-status="todo" data-searchable="auditer sécurité rgpd marc lefèvre cybersécurité">
+                    <p class="task-title">Auditer la conformité RGPD du panel</p>
+                    <div class="task-foot">
+                      <button class="chip-status chip-status--todo" data-action="cycle-status" aria-label="Changer le statut : actuellement À faire"><span class="chip-dot"></span> À faire</button>
+                      <span class="task-meta"><svg class="icon"><use href="#i-clock"></use></svg> 22 juin <svg class="avatar avatar--primary avatar-xs" viewBox="0 0 40 40" role="img" aria-label="Assigné à Marc Lefèvre"><circle class="avatar-bg" cx="20" cy="20" r="20"/><text class="avatar-initials" x="20" y="21">ML</text></svg></span>
+                    </div>
+                  </article>
+                </div>
+              </div>
+
+              <div class="board-col" data-col="doing">
+                <p class="board-col-head"><span class="chip-dot chip-dot--doing"></span> En cours <span class="board-col-count" data-count="doing">2</span></p>
+                <div class="board-col-body" data-searchable-list>
+                  <article class="task-card" data-task data-status="doing" data-searchable="intégrer sso keycloak thomas moreau développement">
+                    <p class="task-title">Intégrer le SSO Keycloak</p>
+                    <div class="task-foot">
+                      <button class="chip-status chip-status--doing" data-action="cycle-status" aria-label="Changer le statut : actuellement En cours"><span class="chip-dot"></span> En cours</button>
+                      <span class="task-meta"><svg class="icon"><use href="#i-clock"></use></svg> 18 juin <svg class="avatar avatar--teal avatar-xs" viewBox="0 0 40 40" role="img" aria-label="Assigné à Thomas Moreau"><circle class="avatar-bg" cx="20" cy="20" r="20"/><text class="avatar-initials" x="20" y="21">TM</text></svg></span>
+                    </div>
+                  </article>
+                  <article class="task-card" data-task data-status="doing" data-searchable="concevoir maquettes tableau de bord léa rousseau design">
+                    <p class="task-title">Concevoir les maquettes du tableau de bord</p>
+                    <div class="task-foot">
+                      <button class="chip-status chip-status--doing" data-action="cycle-status" aria-label="Changer le statut : actuellement En cours"><span class="chip-dot"></span> En cours</button>
+                      <span class="task-meta"><svg class="icon"><use href="#i-clock"></use></svg> 16 juin <svg class="avatar avatar--green avatar-xs" viewBox="0 0 40 40" role="img" aria-label="Assigné à Léa Rousseau"><circle class="avatar-bg" cx="20" cy="20" r="20"/><text class="avatar-initials" x="20" y="21">LR</text></svg></span>
+                    </div>
+                  </article>
+                </div>
+              </div>
+
+              <div class="board-col" data-col="done">
+                <p class="board-col-head"><span class="chip-dot chip-dot--done"></span> Terminé <span class="board-col-count" data-count="done">2</span></p>
+                <div class="board-col-body" data-searchable-list>
+                  <article class="task-card task-card--done" data-task data-status="done" data-searchable="configurer environnement recette thomas moreau">
+                    <p class="task-title">Configurer l'environnement de recette</p>
+                    <div class="task-foot">
+                      <button class="chip-status chip-status--done" data-action="cycle-status" aria-label="Changer le statut : actuellement Terminé"><span class="chip-dot"></span> Terminé</button>
+                      <span class="task-meta"><svg class="avatar avatar--teal avatar-xs" viewBox="0 0 40 40" role="img" aria-label="Assigné à Thomas Moreau"><circle class="avatar-bg" cx="20" cy="20" r="20"/><text class="avatar-initials" x="20" y="21">TM</text></svg></span>
+                    </div>
+                  </article>
+                  <article class="task-card task-card--done" data-task data-status="done" data-searchable="valider cahier des charges camille laurent">
+                    <p class="task-title">Valider le cahier des charges</p>
+                    <div class="task-foot">
+                      <button class="chip-status chip-status--done" data-action="cycle-status" aria-label="Changer le statut : actuellement Terminé"><span class="chip-dot"></span> Terminé</button>
+                      <span class="task-meta"><svg class="avatar avatar--blue avatar-xs" viewBox="0 0 40 40" role="img" aria-label="Assigné à Camille Laurent"><circle class="avatar-bg" cx="20" cy="20" r="20"/><text class="avatar-initials" x="20" y="21">CL</text></svg></span>
+                    </div>
+                  </article>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ PANNEAU AGENDA (E6) ============ -->
+        <section class="panel" role="tabpanel" id="panel-agenda" aria-labelledby="tab-agenda" data-panel="agenda" tabindex="0" hidden>
+          <div class="panel-inner agenda">
+            <div class="section-head">
+              <h3 class="section-title">Agenda partagé</h3>
+              <span class="muted">Échéances et réunions de l'espace · juin 2026</span>
+            </div>
+
+            <div class="agenda-day">
+              <p class="agenda-date"><span class="agenda-dnum">11</span> <span class="agenda-dlabel">Aujourd'hui · jeudi</span></p>
+              <div class="agenda-events" data-searchable-list>
+                <article class="ocard ocard--event" data-searchable="comité de pilotage copil visio sophie">
+                  <span class="ocard-accent" aria-hidden="true"></span>
+                  <div class="ocard-date" aria-hidden="true"><span class="ocard-day">11</span><span class="ocard-mon">JUIN</span></div>
+                  <div class="ocard-main">
+                    <h4 class="ocard-title">Comité de pilotage</h4>
+                    <p class="ocard-meta"><svg class="icon"><use href="#i-clock"></use></svg> 14:00 – 15:00 · <svg class="icon"><use href="#i-video"></use></svg> Twake Visio Meeting</p>
+                    <p class="ocard-people"><svg class="icon"><use href="#i-users"></use></svg> Camille, Sophie, Thomas, Marc</p>
+                  </div>
+                  <button class="btn btn-primary btn-sm ocard-cta" data-noop>Rejoindre</button>
+                </article>
+              </div>
+            </div>
+
+            <div class="agenda-day">
+              <p class="agenda-date"><span class="agenda-dnum">12</span> <span class="agenda-dlabel">Demain · vendredi</span></p>
+              <div class="agenda-events" data-searchable-list>
+                <article class="ocard ocard--event" data-searchable="atelier spécifications api conference room a">
+                  <span class="ocard-accent" aria-hidden="true"></span>
+                  <div class="ocard-date" aria-hidden="true"><span class="ocard-day">12</span><span class="ocard-mon">JUIN</span></div>
+                  <div class="ocard-main">
+                    <h4 class="ocard-title">Atelier spécifications API</h4>
+                    <p class="ocard-meta"><svg class="icon"><use href="#i-clock"></use></svg> 10:00 – 12:00 · <svg class="icon"><use href="#i-pin"></use></svg> Conference Room A</p>
+                    <p class="ocard-people"><svg class="icon"><use href="#i-users"></use></svg> Thomas, Sophie</p>
+                  </div>
+                </article>
+              </div>
+            </div>
+
+            <div class="agenda-day">
+              <p class="agenda-date"><span class="agenda-dnum">16</span> <span class="agenda-dlabel">Lundi</span></p>
+              <div class="agenda-events" data-searchable-list>
+                <article class="ocard ocard--event" data-searchable="revue de sprint visio">
+                  <span class="ocard-accent" aria-hidden="true"></span>
+                  <div class="ocard-date" aria-hidden="true"><span class="ocard-day">16</span><span class="ocard-mon">JUIN</span></div>
+                  <div class="ocard-main">
+                    <h4 class="ocard-title">Revue de sprint</h4>
+                    <p class="ocard-meta"><svg class="icon"><use href="#i-clock"></use></svg> 11:00 – 11:45 · <svg class="icon"><use href="#i-video"></use></svg> Twake Visio Meeting</p>
+                  </div>
+                </article>
+                <article class="ocard" data-searchable="échéance livraison maquettes léa">
+                  <span class="ocard-accent" aria-hidden="true"></span>
+                  <span class="ocard-ico" aria-hidden="true"><svg class="icon"><use href="#i-flag"></use></svg></span>
+                  <div class="ocard-main">
+                    <h4 class="ocard-title">Échéance : livraison des maquettes</h4>
+                    <p class="ocard-meta"><svg class="icon"><use href="#i-check-square"></use></svg> Tâche liée · <span class="assignee"><svg class="avatar avatar--green avatar-xs" viewBox="0 0 40 40" role="img" aria-label="Léa Rousseau"><circle class="avatar-bg" cx="20" cy="20" r="20"/><text class="avatar-initials" x="20" y="21">LR</text></svg> Léa</span></p>
+                  </div>
+                </article>
+              </div>
+            </div>
+
+            <div class="agenda-day">
+              <p class="agenda-date"><span class="agenda-dnum">20</span> <span class="agenda-dlabel">Vendredi</span></p>
+              <div class="agenda-events" data-searchable-list>
+                <article class="ocard ocard--event" data-searchable="démo client b2b conference room b">
+                  <span class="ocard-accent" aria-hidden="true"></span>
+                  <div class="ocard-date" aria-hidden="true"><span class="ocard-day">20</span><span class="ocard-mon">JUIN</span></div>
+                  <div class="ocard-main">
+                    <h4 class="ocard-title">Démo client B2B</h4>
+                    <p class="ocard-meta"><svg class="icon"><use href="#i-clock"></use></svg> 15:00 – 16:00 · <svg class="icon"><use href="#i-pin"></use></svg> Conference Room B</p>
+                  </div>
+                </article>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ PANNEAU MAIL (vue allégée) ============ -->
+        <section class="panel" role="tabpanel" id="panel-mail" aria-labelledby="tab-mail" data-panel="mail" tabindex="0" hidden>
+          <div class="panel-inner mail">
+            <div class="section-head">
+              <h3 class="section-title">Mail de l'espace</h3>
+              <span class="badge badge-sync">Vue allégée</span>
+            </div>
+            <ul class="mail-list" data-searchable-list>
+              <li class="mail-row mail-row--unread" data-searchable="appel d'offres b2b client direction">
+                <svg class="avatar avatar--blue avatar-xs" viewBox="0 0 40 40" role="img" aria-label="Direction Client"><circle class="avatar-bg" cx="20" cy="20" r="20"/><text class="avatar-initials" x="20" y="21">DC</text></svg>
+                <div class="mail-main">
+                  <p class="mail-from">Direction Client B2B</p>
+                  <p class="mail-subject">Retour sur le cahier des charges v3</p>
+                  <p class="mail-preview muted">Bonjour, nous validons l'orientation proposée. Quelques remarques sur la partie sécurité…</p>
+                </div>
+                <span class="mail-time muted">09:12</span>
+              </li>
+              <li class="mail-row" data-searchable="nadia el amrani partenaire externe accès">
+                <svg class="avatar avatar--indigo avatar-xs" viewBox="0 0 40 40" role="img" aria-label="Nadia El Amrani"><circle class="avatar-bg" cx="20" cy="20" r="20"/><text class="avatar-initials" x="20" y="21">NE</text></svg>
+                <div class="mail-main">
+                  <p class="mail-from">Nadia El Amrani <span class="badge badge-ext">Externe</span></p>
+                  <p class="mail-subject">Demande d'accès au Drive partagé</p>
+                  <p class="mail-preview muted">Merci pour l'invitation à l'espace. Pourriez-vous m'ouvrir l'accès aux specs…</p>
+                </div>
+                <span class="mail-time muted">Hier</span>
+              </li>
+              <li class="mail-row" data-searchable="twake visio compte rendu copil">
+                <svg class="avatar avatar--teal avatar-xs" viewBox="0 0 40 40" role="img" aria-label="Twake Visio"><circle class="avatar-bg" cx="20" cy="20" r="20"/><text class="avatar-initials" x="20" y="21">TV</text></svg>
+                <div class="mail-main">
+                  <p class="mail-from">Twake Visio Meeting</p>
+                  <p class="mail-subject">Compte-rendu et enregistrement du COPIL</p>
+                  <p class="mail-preview muted">Le compte-rendu de votre réunion est disponible dans l'espace Fichiers.</p>
+                </div>
+                <span class="mail-time muted">9 juin</span>
+              </li>
+            </ul>
+          </div>
+        </section>
+
+      </div><!-- /.panels -->
+    </main>
+
+    <!-- Assistant IA : volet DOCKÉ à droite. Ouvert, il redimensionne la zone
+         centrale (split view, sans scrim) ; ≤1199px il se replie en survol. -->
+    <aside class="ai-dock" data-ai-dock aria-label="Assistant IA de l'espace" inert>
+      <div class="ai-dock-head">
+        <h2 class="ai-dock-title">
+          <span class="ai-badge-ico" aria-hidden="true"><svg class="icon"><use href="#i-sparkles"></use></svg></span>
+          Assistant IA <span class="badge badge-role">Souverain</span>
+        </h2>
+        <button class="icon-btn" data-action="close-assistant" aria-label="Fermer l'assistant"><svg class="icon"><use href="#i-close"></use></svg></button>
+      </div>
+      <div class="ai-dock-body ai-body">
+        <div class="ai-conversation" data-ai-conversation aria-live="polite">
+          <div class="ai-msg ai-msg--bot">
+            <span class="ai-avatar" aria-hidden="true"><svg class="icon"><use href="#i-sparkles"></use></svg></span>
+            <div class="ai-bubble">
+              Bonjour Camille 👋 Je suis l'assistant de l'espace <strong>B2B Admin Panel</strong>.
+              Je peux résumer l'activité, retrouver des documents, suivre les tâches ou rédiger un compte-rendu — à partir des données de l'espace, sans rien envoyer à l'extérieur.
+            </div>
+          </div>
+        </div>
+        <div class="ai-chips" data-ai-chips>
+          <p class="ai-chips-label">Suggestions</p>
+          <button class="ai-chip" data-ai-prompt="resume"><svg class="icon"><use href="#i-feed"></use></svg> Résumer l'activité récente</button>
+          <button class="ai-chip" data-ai-prompt="taches"><svg class="icon"><use href="#i-check-square"></use></svg> Quelles tâches sont à risque&nbsp;?</button>
+          <button class="ai-chip" data-ai-prompt="copil"><svg class="icon"><use href="#i-doc"></use></svg> Préparer un compte-rendu de réunion</button>
+          <button class="ai-chip" data-ai-prompt="search"><svg class="icon"><use href="#i-search"></use></svg> Retrouver un document</button>
+        </div>
+      </div>
+      <form class="ai-composer" data-ai-composer>
+        <input class="composer-input" type="text" placeholder="Posez une question sur l'espace…" aria-label="Votre question à l'assistant" data-input="ai">
+        <button type="submit" class="btn btn-primary composer-send" data-action="ai-send" aria-label="Envoyer la question"><svg class="icon"><use href="#i-send"></use></svg></button>
+      </form>
+      <p class="ai-foot"><svg class="icon"><use href="#i-shield"></use></svg> Traitement souverain — vos données restent dans l'ECS, aucun appel externe.</p>
+    </aside>
+  </div><!-- /.app -->
+
+  <!-- Bouton flottant d'accès à l'assistant (ouvre le volet docké) -->
+  <button class="ai-fab" data-action="toggle-assistant" aria-label="Ouvrir l'assistant IA de l'espace" aria-expanded="false" title="Assistant IA">
+    <span class="ai-fab-ico" aria-hidden="true"><svg class="icon"><use href="#i-sparkles"></use></svg></span>
+    <span class="ai-fab-label">Assistant IA</span>
+  </button>
+
+  <!-- ======================================================================
+       OVERLAYS (modales & panneaux latéraux)
+       ====================================================================== -->
+  <div class="scrim" data-scrim hidden></div>
+
+  <!-- E1 : Création d'espace -->
+  <div class="modal" data-overlay="create-space" role="dialog" aria-modal="true" aria-labelledby="cs-title" hidden>
+    <div class="modal-head">
+      <h2 class="modal-title" id="cs-title">Créer un espace</h2>
+      <button class="icon-btn" data-close aria-label="Fermer"><svg class="icon"><use href="#i-close"></use></svg></button>
+    </div>
+    <div class="modal-body">
+      <label class="field">
+        <span class="field-label">Nom de l'espace</span>
+        <input class="input" type="text" placeholder="ex. Refonte portail client" data-noop>
+      </label>
+      <div class="field">
+        <span class="field-label">Type d'espace</span>
+        <div class="seg" role="group" aria-label="Type d'espace">
+          <button class="seg-btn is-active" data-seg>Projet</button>
+          <button class="seg-btn" data-seg>Service</button>
+          <button class="seg-btn" data-seg>Groupe de travail</button>
+          <button class="seg-btn" data-seg>Thématique</button>
+        </div>
+      </div>
+      <label class="field">
+        <span class="field-label">Description</span>
+        <textarea class="input input--area" rows="3" placeholder="À quoi sert cet espace ?" data-noop></textarea>
+      </label>
+      <p class="field-note"><svg class="icon"><use href="#i-shield"></use></svg> La création d'un espace dépend de vos droits sur l'organisation.</p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" data-close>Annuler</button>
+      <button class="btn btn-primary" data-action="create-space-confirm">Créer l'espace</button>
+    </div>
+  </div>
+
+  <!-- E2 : Personnalisation de l'espace -->
+  <div class="modal" data-overlay="customize" role="dialog" aria-modal="true" aria-labelledby="cu-title" hidden>
+    <div class="modal-head">
+      <h2 class="modal-title" id="cu-title">Personnaliser l'espace</h2>
+      <button class="icon-btn" data-close aria-label="Fermer"><svg class="icon"><use href="#i-close"></use></svg></button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <span class="field-label">Logo de l'espace</span>
+        <div class="logo-picker" role="group" aria-label="Choisir un logo">
+          <button class="logo-opt is-active" data-logo="grad" aria-label="Logo dégradé Twake"><span class="space-mini space-mini--grad"></span></button>
+          <button class="logo-opt" data-logo="teal" aria-label="Logo turquoise"><span class="space-mini space-mini--teal"></span></button>
+          <button class="logo-opt" data-logo="violet" aria-label="Logo violet"><span class="space-mini space-mini--violet"></span></button>
+          <button class="logo-opt" data-logo="amber" aria-label="Logo ambre"><span class="space-mini space-mini--amber"></span></button>
+          <button class="logo-opt" data-logo="green" aria-label="Logo vert"><span class="space-mini space-mini--green"></span></button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="field-label">Couleur d'accent <span class="muted small">— appliquée en direct</span></span>
+        <div class="swatches" role="group" aria-label="Choisir une couleur d'accent">
+          <button class="swatch sw--primary is-active" data-accent="--primaryColor" aria-label="Bleu (défaut)" title="Bleu"></button>
+          <button class="swatch sw--brand" data-accent="--brandBlue" aria-label="Bleu Twake" title="Bleu Twake"></button>
+          <button class="swatch sw--info" data-accent="--infoColor" aria-label="Turquoise" title="Turquoise"></button>
+          <button class="swatch sw--success" data-accent="--successColor" aria-label="Vert" title="Vert"></button>
+          <button class="swatch sw--warning" data-accent="--warningColor" aria-label="Ambre" title="Ambre"></button>
+          <button class="swatch sw--role" data-accent="--roleBadgeText" aria-label="Violet" title="Violet"></button>
+          <button class="swatch sw--error" data-accent="--errorColor" aria-label="Rouge" title="Rouge"></button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="field-label">Widgets affichés</span>
+        <div class="widgets">
+          <label class="check"><input type="checkbox" data-widget="feed" checked> <span class="check-box" aria-hidden="true"><svg class="icon"><use href="#i-check"></use></svg></span> Fil d'actualité</label>
+          <label class="check"><input type="checkbox" data-widget="chat" checked> <span class="check-box" aria-hidden="true"><svg class="icon"><use href="#i-check"></use></svg></span> Discussions</label>
+          <label class="check"><input type="checkbox" data-widget="files" checked> <span class="check-box" aria-hidden="true"><svg class="icon"><use href="#i-check"></use></svg></span> Fichiers</label>
+          <label class="check"><input type="checkbox" data-widget="tasks" checked> <span class="check-box" aria-hidden="true"><svg class="icon"><use href="#i-check"></use></svg></span> Tâches</label>
+          <label class="check"><input type="checkbox" data-widget="agenda" checked> <span class="check-box" aria-hidden="true"><svg class="icon"><use href="#i-check"></use></svg></span> Agenda</label>
+          <label class="check"><input type="checkbox" data-widget="mail" checked> <span class="check-box" aria-hidden="true"><svg class="icon"><use href="#i-check"></use></svg></span> Mail</label>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" data-close>Fermer</button>
+      <button class="btn btn-primary" data-close>Enregistrer</button>
+    </div>
+  </div>
+
+  <!-- E3 : Membres (panneau latéral) -->
+  <aside class="drawer" data-overlay="members" role="dialog" aria-modal="true" aria-labelledby="mb-title" hidden>
+    <div class="drawer-head">
+      <h2 class="modal-title" id="mb-title"><svg class="icon"><use href="#i-users"></use></svg> Membres · 7</h2>
+      <button class="icon-btn" data-close aria-label="Fermer"><svg class="icon"><use href="#i-close"></use></svg></button>
+    </div>
+    <div class="drawer-body">
+      <!-- Invitation interne + externe en autonomie -->
+      <div class="invite">
+        <p class="field-label">Inviter un membre</p>
+        <div class="invite-row">
+          <input class="input" type="email" placeholder="prénom.nom@email.com" aria-label="E-mail à inviter" data-input="invite">
+          <select class="select" aria-label="Rôle à attribuer" data-noop>
+            <option>Contributeur</option>
+            <option>Administrateur</option>
+            <option>Lecteur</option>
+          </select>
+          <button class="btn btn-primary" data-action="invite">Inviter</button>
+        </div>
+        <p class="field-note"><svg class="icon"><use href="#i-globe"></use></svg> Vous pouvez inviter en autonomie des membres <strong>internes</strong> comme <strong>externes</strong> à l'organisation.</p>
+      </div>
+
+      <div class="members-list" data-members-list>
+        <div class="member">
+          <svg class="avatar avatar--blue" viewBox="0 0 40 40" role="img" aria-label="Camille Laurent"><circle class="avatar-bg" cx="20" cy="20" r="20"/><text class="avatar-initials" x="20" y="21">CL</text></svg>
+          <div class="member-id"><p class="member-name">Camille Laurent</p><p class="muted small">camille.laurent@org.fr</p></div>
+          <span class="badge badge-role">Owner</span>
+        </div>
+        <div class="member">
+          <svg class="avatar avatar--teal" viewBox="0 0 40 40" role="img" aria-label="Thomas Moreau"><circle class="avatar-bg" cx="20" cy="20" r="20"/><text class="avatar-initials" x="20" y="21">TM</text></svg>
+          <div class="member-id"><p class="member-name">Thomas Moreau</p><p class="muted small">thomas.moreau@org.fr</p></div>
+          <select class="select select--role" aria-label="Rôle de Thomas Moreau" data-noop><option>Administrateur</option><option>Contributeur</option><option>Lecteur</option></select>
+        </div>
+        <div class="member">
+          <svg class="avatar avatar--violet" viewBox="0 0 40 40" role="img" aria-label="Sophie Dubois"><circle class="avatar-bg" cx="20" cy="20" r="20"/><text class="avatar-initials" x="20" y="21">SD</text></svg>
+          <div class="member-id"><p class="member-name">Sophie Dubois</p><p class="muted small">sophie.dubois@org.fr</p></div>
+          <select class="select select--role" aria-label="Rôle de Sophie Dubois" data-noop><option>Contributeur</option><option>Administrateur</option><option>Lecteur</option></select>
+        </div>
+        <div class="member">
+          <svg class="avatar avatar--green" viewBox="0 0 40 40" role="img" aria-label="Léa Rousseau"><circle class="avatar-bg" cx="20" cy="20" r="20"/><text class="avatar-initials" x="20" y="21">LR</text></svg>
+          <div class="member-id"><p class="member-name">Léa Rousseau</p><p class="muted small">lea.rousseau@org.fr</p></div>
+          <select class="select select--role" aria-label="Rôle de Léa Rousseau" data-noop><option>Contributeur</option><option>Administrateur</option><option>Lecteur</option></select>
+        </div>
+        <div class="member">
+          <svg class="avatar avatar--amber" viewBox="0 0 40 40" role="img" aria-label="Lucas Bernard"><circle class="avatar-bg" cx="20" cy="20" r="20"/><text class="avatar-initials" x="20" y="21">LB</text></svg>
+          <div class="member-id"><p class="member-name">Lucas Bernard</p><p class="muted small">lucas.bernard@org.fr</p></div>
+          <select class="select select--role" aria-label="Rôle de Lucas Bernard" data-noop><option>Lecteur</option><option>Contributeur</option><option>Administrateur</option></select>
+        </div>
+        <div class="member">
+          <svg class="avatar avatar--indigo" viewBox="0 0 40 40" role="img" aria-label="Nadia El Amrani"><circle class="avatar-bg" cx="20" cy="20" r="20"/><text class="avatar-initials" x="20" y="21">NE</text></svg>
+          <div class="member-id"><p class="member-name">Nadia El Amrani <span class="badge badge-ext">Externe</span></p><p class="muted small">nadia@partenaire.com</p></div>
+          <select class="select select--role" aria-label="Rôle de Nadia El Amrani" data-noop><option>Contributeur</option><option>Lecteur</option></select>
+        </div>
+        <div class="member">
+          <svg class="avatar avatar--primary" viewBox="0 0 40 40" role="img" aria-label="Marc Lefèvre"><circle class="avatar-bg" cx="20" cy="20" r="20"/><text class="avatar-initials" x="20" y="21">ML</text></svg>
+          <div class="member-id"><p class="member-name">Marc Lefèvre</p><p class="muted small">marc.lefevre@org.fr</p></div>
+          <select class="select select--role" aria-label="Rôle de Marc Lefèvre" data-noop><option>Administrateur</option><option>Contributeur</option><option>Lecteur</option></select>
+        </div>
+      </div>
+
+      <!-- Droits par ressource (matrice ajustable) -->
+      <div class="rights">
+        <p class="field-label">Droits par ressource <span class="muted small">— ajustables à tout moment</span></p>
+        <div class="rights-table">
+          <div class="rights-row rights-row--head">
+            <span>Ressource</span><span>Lecture</span><span>Écriture</span><span>Partage</span>
+          </div>
+          <div class="rights-row">
+            <span class="rights-res"><svg class="icon"><use href="#i-folder"></use></svg> Fichiers</span>
+            <button class="toggle is-on" data-toggle aria-pressed="true" aria-label="Lecture Fichiers"></button>
+            <button class="toggle is-on" data-toggle aria-pressed="true" aria-label="Écriture Fichiers"></button>
+            <button class="toggle" data-toggle aria-pressed="false" aria-label="Partage Fichiers"></button>
+          </div>
+          <div class="rights-row">
+            <span class="rights-res"><svg class="icon"><use href="#i-check-square"></use></svg> Tâches</span>
+            <button class="toggle is-on" data-toggle aria-pressed="true" aria-label="Lecture Tâches"></button>
+            <button class="toggle is-on" data-toggle aria-pressed="true" aria-label="Écriture Tâches"></button>
+            <button class="toggle is-on" data-toggle aria-pressed="true" aria-label="Partage Tâches"></button>
+          </div>
+          <div class="rights-row">
+            <span class="rights-res"><svg class="icon"><use href="#i-calendar"></use></svg> Agenda</span>
+            <button class="toggle is-on" data-toggle aria-pressed="true" aria-label="Lecture Agenda"></button>
+            <button class="toggle" data-toggle aria-pressed="false" aria-label="Écriture Agenda"></button>
+            <button class="toggle" data-toggle aria-pressed="false" aria-label="Partage Agenda"></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- E9 : Notifications (panneau latéral) -->
+  <aside class="drawer drawer--narrow" data-overlay="notifications" role="dialog" aria-modal="true" aria-labelledby="nt-title" hidden>
+    <div class="drawer-head">
+      <h2 class="modal-title" id="nt-title"><svg class="icon"><use href="#i-bell"></use></svg> Notifications</h2>
+      <div class="drawer-head-actions">
+        <button class="link-btn" data-action="mark-all-read">Tout marquer lu</button>
+        <button class="icon-btn" data-close aria-label="Fermer"><svg class="icon"><use href="#i-close"></use></svg></button>
+      </div>
+    </div>
+    <div class="drawer-body">
+      <ul class="notif-list" data-notif-list>
+        <li class="notif is-unread" data-notif data-type="task">
+          <span class="notif-ico notif-ico--task" aria-hidden="true"><svg class="icon"><use href="#i-check-square"></use></svg></span>
+          <div class="notif-body">
+            <p class="notif-text"><strong>Tâche assignée</strong> — « Intégrer le SSO Keycloak » vous est assignée.</p>
+            <p class="notif-when muted small">il y a 4 min</p>
+          </div>
+          <span class="notif-dot" aria-label="Non lu"></span>
+        </li>
+        <li class="notif is-unread" data-notif data-type="file">
+          <span class="notif-ico notif-ico--file" aria-hidden="true"><svg class="icon"><use href="#i-doc"></use></svg></span>
+          <div class="notif-body">
+            <p class="notif-text"><strong>Document modifié</strong> — Léa Rousseau a mis à jour « Charte graphique.pdf ».</p>
+            <p class="notif-when muted small">il y a 22 min</p>
+          </div>
+          <span class="notif-dot" aria-label="Non lu"></span>
+        </li>
+        <li class="notif is-unread" data-notif data-type="mention">
+          <span class="notif-ico notif-ico--mention" aria-hidden="true"><svg class="icon"><use href="#i-at"></use></svg></span>
+          <div class="notif-body">
+            <p class="notif-text"><strong>Mention</strong> — Camille Laurent vous a mentionné dans #général.</p>
+            <p class="notif-when muted small">il y a 1 h</p>
+          </div>
+          <span class="notif-dot" aria-label="Non lu"></span>
+        </li>
+        <li class="notif" data-notif data-type="event">
+          <span class="notif-ico notif-ico--event" aria-hidden="true"><svg class="icon"><use href="#i-calendar"></use></svg></span>
+          <div class="notif-body">
+            <p class="notif-text"><strong>Événement ajouté</strong> — « Comité de pilotage » aujourd'hui à 14:00.</p>
+            <p class="notif-when muted small">il y a 1 h</p>
+          </div>
+        </li>
+      </ul>
+
+      <!-- E9 : réglage du niveau d'alerte par type -->
+      <div class="notif-prefs">
+        <p class="field-label">Niveau d'alerte par type</p>
+        <label class="pref-row"><span><svg class="icon"><use href="#i-check-square"></use></svg> Tâches assignées</span><button class="toggle is-on" data-toggle aria-pressed="true" aria-label="Alertes tâches"></button></label>
+        <label class="pref-row"><span><svg class="icon"><use href="#i-doc"></use></svg> Documents modifiés</span><button class="toggle is-on" data-toggle aria-pressed="true" aria-label="Alertes documents"></button></label>
+        <label class="pref-row"><span><svg class="icon"><use href="#i-at"></use></svg> Mentions</span><button class="toggle is-on" data-toggle aria-pressed="true" aria-label="Alertes mentions"></button></label>
+        <label class="pref-row"><span><svg class="icon"><use href="#i-calendar"></use></svg> Événements</span><button class="toggle" data-toggle aria-pressed="false" aria-label="Alertes événements"></button></label>
+      </div>
+    </div>
+  </aside>
+
+  <!-- (Assistant IA déplacé : volet docké dans .app, voir plus haut) -->
+
+  <!-- Conteneur de toasts (notifications temps réel simulées) -->
+  <div class="toast-stack" data-toasts aria-live="polite" aria-atomic="false"></div>
+
+  <!-- Région d'annonces a11y -->
+  <p class="sr-only" data-live aria-live="polite"></p>
+
+  <!-- Cube mark réutilisable pour le logo d'en-tête -->
+  <svg class="sprite" aria-hidden="true" focusable="false" width="0" height="0"><defs>
+    <g id="cube-mark"><path d="M18.5622 7.74854C18.5836 7.73603 18.6014 7.71812 18.6138 7.69659C18.6262 7.67507 18.6327 7.65067 18.6327 7.62585C18.6327 7.60103 18.6262 7.57664 18.6138 7.55511C18.6014 7.53358 18.5836 7.51567 18.5622 7.50316L13.1384 4.35201C12.7914 4.15086 12.3974 4.04492 11.9962 4.04492C11.5951 4.04492 11.2011 4.15086 10.8541 4.35201L5.43134 7.50316C5.4099 7.51567 5.39211 7.53358 5.37975 7.55511C5.36739 7.57664 5.36088 7.60103 5.36088 7.62585C5.36088 7.65067 5.36739 7.67507 5.37975 7.69659C5.39211 7.71812 5.4099 7.73603 5.43134 7.74854L11.9254 11.5687C11.9472 11.5816 11.9721 11.5883 11.9975 11.5883C12.0228 11.5883 12.0477 11.5816 12.0696 11.5687L18.5622 7.74854ZM4.82341 8.71476C4.80175 8.70226 4.77718 8.69569 4.75216 8.69573C4.72715 8.69577 4.70259 8.70241 4.68097 8.71499C4.65935 8.72757 4.64144 8.74563 4.62904 8.76735C4.61664 8.78907 4.61019 8.81368 4.61035 8.83869V15.0135C4.61089 15.3111 4.68932 15.6033 4.83784 15.8612C4.98635 16.119 5.19979 16.3335 5.45691 16.4833L11.2152 19.9359C11.2368 19.9484 11.2613 19.9549 11.2862 19.9549C11.3111 19.9549 11.3356 19.9484 11.3572 19.9359C11.3788 19.9235 11.3967 19.9056 11.4092 19.884C11.4217 19.8624 11.4282 19.8379 11.4283 19.813V12.6489C11.4282 12.624 11.4217 12.5995 11.4092 12.578C11.3967 12.5564 11.3788 12.5385 11.3572 12.526L4.82341 8.71476ZM12.5646 12.6738V19.8113C12.5646 19.8362 12.5712 19.8606 12.5837 19.8822C12.5961 19.9038 12.6141 19.9217 12.6357 19.9342C12.6572 19.9466 12.6817 19.9532 12.7067 19.9531C12.7316 19.9531 12.7561 19.9466 12.7776 19.9341L18.5356 16.4815C18.7925 16.3319 19.0058 16.1177 19.1544 15.8602C19.303 15.6027 19.3816 15.3108 19.3825 15.0135V8.83869C19.3824 8.8138 19.3758 8.78937 19.3633 8.76785C19.3508 8.74632 19.3328 8.72846 19.3112 8.71606C19.2897 8.70365 19.2652 8.69713 19.2403 8.69715C19.2154 8.69717 19.191 8.70374 19.1694 8.71618L12.6356 12.5513C12.6141 12.5637 12.5962 12.5815 12.5837 12.603C12.5713 12.6245 12.5647 12.6489 12.5646 12.6738Z" fill="#ffffff"/></g>
+    <!-- Dégradé du cube d'espace (déplacé ici pour rester disponible après le changement de logo du rail) -->
+    <linearGradient id="cubeGrad" x1="4.16" y1="21.85" x2="22.64" y2="1.47" gradientUnits="userSpaceOnUse">
+      <stop offset="0.23" stop-color="#3D74FE"/>
+      <stop offset="1" stop-color="#91CFFF"/>
+    </linearGradient>
+  </defs></svg>
+
+  <script src="app.js"></script>
+</body>
+</html>
