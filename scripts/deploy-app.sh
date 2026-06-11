@@ -20,6 +20,7 @@
 #
 # Known slugs (slug → source dir → stable dir):
 #   twakespace   twake-space-app/  ~/cozy-apps/twake-space-app/
+#   twakespaceng twake-space-ng-app/ ~/cozy-apps/twake-space-ng-app/
 #   grist        grist-app/        ~/cozy-apps/grist-app/
 #   excalidraw   excalidraw-app/   ~/cozy-apps/excalidraw-app/
 #   kanbn        kanbn-app/        ~/cozy-apps/kanbn-app/
@@ -58,6 +59,7 @@ fi
 
 case "$slug" in
   twakespace)  src_rel="twake-space-app"  ; dst_dir="$HOME/cozy-apps/twake-space-app"  ;;
+  twakespaceng) src_rel="twake-space-ng-app"; dst_dir="$HOME/cozy-apps/twake-space-ng-app" ;;
   grist)       src_rel="grist-app"        ; dst_dir="$HOME/cozy-apps/grist-app"        ;;
   excalidraw)  src_rel="excalidraw-app"   ; dst_dir="$HOME/cozy-apps/excalidraw-app"   ;;
   kanbn)       src_rel="kanbn-app"        ; dst_dir="$HOME/cozy-apps/kanbn-app"        ;;
